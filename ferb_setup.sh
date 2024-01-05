@@ -10,20 +10,12 @@ JNUM=4
 OUTDIR="$(pwd)"
 
 # Install dependencies
-GIT_DEPS="git"
 SDK_DEPS="cmake gcc-arm-none-eabi gcc g++"
 OPENOCD_DEPS="gdb-multiarch automake autoconf build-essential texinfo libtool libftdi-dev libusb-1.0-0-dev"
-# UART_DEPS="minicom"
+UART_DEPS="minicom"
 
 # Build full list of dependencies
-# DEPS="$GIT_DEPS $SDK_DEPS"
-DEPS="$GIT_DEPS $SDK_DEPS $OPENOCD_DEPS"
-
-# if [[ "$SKIP_OPENOCD" == 1 ]]; then
-#     echo "Skipping OpenOCD (debug support)"
-# else
-#     DEPS="$DEPS $OPENOCD_DEPS"
-# fi
+DEPS="$SDK_DEPS $OPENOCD_DEPS $UART_DEPS"
 
 echo "Installing Dependencies"
 sudo apt update
@@ -34,7 +26,8 @@ GITHUB_PREFIX="https://github.com/raspberrypi/"
 GITHUB_SUFFIX=".git"
 SDK_BRANCH="master"
 
-for REPO in sdk examples extras playground
+# We might never need to use pico-extras, but it won't hurt to have it for now
+for REPO in sdk extras
 do
     DEST="$OUTDIR/pico-$REPO"
 
@@ -60,26 +53,12 @@ done
 
 cd $OUTDIR
 
-# Pick up new variables we just defined
-source ~/.bashrc
+# we also need the pico_sdk_import.cmake file in order to import the SDK into our project
+cp $OUTDIR/pico-sdk/external/pico_sdk_import.cmake lib/.
 
-# Build a couple of examples
-# cd "$OUTDIR/pico-examples"
-# mkdir build
-# cd build
-# cmake ../ -DCMAKE_BUILD_TYPE=Debug
-# 
-# for e in blink hello_world
-# do
-#     echo "Building $e"
-#     cd $e
-#     make -j$JNUM
-#     cd ..
-# done
 
-# cd $OUTDIR
-
-# Picoprobe and picotool
+# Picoprobe and picotool - these are used for debugging
+# I will hopefully test these out later
 # for REPO in picoprobe picotool
 # do
 #     DEST="$OUTDIR/$REPO"
@@ -130,14 +109,3 @@ source ~/.bashrc
 # fi
 # 
 # cd $OUTDIR
-
-
-# Enable UART
-# if [[ "$SKIP_UART" == 1 ]]; then
-#     echo "Skipping uart configuration"
-# else
-#     sudo apt install -y $UART_DEPS
-#     echo "Disabling Linux serial console (UART) so we can use it for pico"
-#     sudo raspi-config nonint do_serial 2
-#     echo "You must run sudo reboot to finish UART setup"
-# fi
