@@ -54,7 +54,7 @@ done
 cd $OUTDIR
 
 # we also need the pico_sdk_import.cmake file in order to import the SDK into our project
-cp $OUTDIR/pico-sdk/external/pico_sdk_import.cmake lib/.
+cp $OUTDIR/pico-sdk/external/pico_sdk_import.cmake .
 
 
 # Picoprobe and picotool - these are used for debugging
