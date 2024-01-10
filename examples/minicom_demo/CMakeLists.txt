@@ -1,5 +1,5 @@
 add_executable(minicom_demo
-    minicom.c
+    minicom.cpp
 )
 
 target_link_libraries(minicom_demo
