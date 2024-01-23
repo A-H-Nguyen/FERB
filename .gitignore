@@ -4,3 +4,4 @@ pico_sdk_import.cmake
 
 .vscode/
 .vs/
+*.out
