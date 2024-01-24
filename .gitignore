@@ -1,7 +1,10 @@
-build/
-pico-*/
-pico_sdk_import.cmake
-
 .vscode/
 .vs/
+__pycache__/
+
+build/
+pico-*/
+
+
+pico_sdk_import.cmake
 *.out
