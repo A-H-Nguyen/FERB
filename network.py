@@ -17,7 +17,9 @@ for net in nets:
 # wlan.connect(ssid='NUwave', auth=(network.WLAN.WPA2_EAP, 'ha.je', 'password'), key_mgmt='WPA-EAP')
 ssid = 'NUwave-guest'
 wlan.connect(ssid=ssid)
+ip = wlan.ifconfig()[0]
 
+print(f'connected on {ip}')
 if wlan.isconnected():
     print(r'Connected to', ssid)
 
