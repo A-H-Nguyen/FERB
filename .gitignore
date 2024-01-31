@@ -5,6 +5,6 @@ __pycache__/
 build/
 pico-*/
 
-
+.micropico
 pico_sdk_import.cmake
 *.out
