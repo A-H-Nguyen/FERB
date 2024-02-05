@@ -1,9 +1,8 @@
 import socket
 
-# Use SOCK_STREAM for TCP    
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
     _HOST = socket.gethostname()
-    _IP = socket.gethostbyname(_HOST)
+    _IP = '10.42.0.1'  # taken from ifconfig output
     _PORT = 12345
 
     print("Host Name =\t", _HOST)
@@ -11,33 +10,38 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
 
     _socket.bind((_IP, _PORT))
 
+    print(f"TCP server is listening on {(_IP, _PORT)}...\n")
 
-    print(f"TCP server is listening on {(_IP, _PORT)}")
     _socket.listen(1)
-    
-    # conn, addr = _socket.accept()
-    # with conn:
-    #     print(f"Connected by {addr}")
-    #     while True:
-    #         data = conn.recv(1024)
-    #         if not data:
-    #             break
-    #         conn.sendall(data)
-    try:
-        while True:
-            connection, client_address = _socket.accept()
-            print(f"Connection established with {client_address}")
+    connection, client_address = _socket.accept()
+    print(f"Connection established with {client_address}")
+
+    while True:
+        try:
+            temps = []
 
             data = connection.recv(1024)
-            print(f"Received data from {client_address}: {data.decode()}")
+            if not data:
+                raise Exception("Connection closed by client.")
+            
+            for i in range(0, len(data), 2):
+                pixel_value = data[i] | (data[i+1] << 8)
+                temps.append(pixel_value)
 
-    #     # Add your own logic to respond to the client if needed
-    #     # For example:
-    #     # connection.sendall(b"Server received your message")
+                # print(pixel_value, end=' ')
 
+                # if (i + 2) % 16 == 0:
+                #     print()
+
+                if len(temps) > 63:
+                    break
+
+
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+        except KeyboardInterrupt as k:
+            print("Server terminated by keyboard interrupt.")
             connection.close()
-
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        _socket.close()
+            break
