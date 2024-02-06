@@ -1,66 +1,123 @@
 import network
 import usocket as socket
-import uselect as select
 import time
 
-class network_handler:
-    def __init__(self, _ssid, _pass, _ip, _port, station_mode:bool=True) -> None:
+
+class NetHandler:
+    """
+    A class to handle network operations such as connecting to Wi-Fi networks and socket servers.
+
+    Attributes:
+        _SSID (str): The SSID of the Wi-Fi network.
+        _PASS (str): The password of the Wi-Fi network.
+        _IP (str): The IP address of the socket server.
+        _PORT (int): The port number of the socket server.
+    """
+
+    def __init__(self, _ssid, _pass, _ip, _port, station_mode: bool = True) -> None:
+        """
+        Initializes the network handler with SSID, password, IP address, and port.
+
+        Args:
+            _ssid (str): The SSID of the Wi-Fi network.
+            _pass (str): The password of the Wi-Fi network.
+            _ip (str): The IP address of the socket server.
+            _port (int): The port number of the socket server.
+            station_mode (bool, optional): Whether to operate in station mode (default) or access point mode.
+        """
         self._SSID = _ssid
         self._PASS = _pass
         self._IP = _ip
         self._PORT = _port
 
-        if station_mode:
-            self.wlan = network.WLAN(network.STA_IF)
-        else:
-            self.wlan = network.WLAN(network.AP_IF)
-        self.wlan.active(True)
+        # Create WLAN object in station mode (by default) or access point mode
+        self.wlan = network.WLAN(network.STA_IF if station_mode else network.AP_IF)
 
-        self._socket = socket.socket()
+        self.wlan.active(True)          # Activate WLAN interface
+        self._socket = socket.socket()  # Create a socket object
 
-    def _get_networks(self):
+    def print_wifi_networks(self):
+        """
+        Scans for available Wi-Fi networks and prints their SSID and RSSI (signal strength).
+        """
         nets = self.wlan.scan()
         print(f"\nAvailable networks:")
         for net in nets:
-            # Access the 0th element of the tuple for SSID
-            # Access the 3rd element of the tuple for RSSI
             print(f"SSID: {net[0]}, RSSI: {net[3]}")
         print(f"\n-------------------------------------\n")
 
-    def _connect_wifi(self):    
-        _wlan_connected = False
-        while not _wlan_connected:
-            print(f"Attempting to connect to {self._SSID}...\n")
-            self.wlan.connect(ssid=self._SSID, key=self._PASS)
-            time.sleep(5)
+    def connect_to_wifi(self) -> bool:
+        """
+        Attempts to connect to the specified Wi-Fi network using SSID and password.
 
-            if self.wlan.isconnected():
-                _wlan_connected = True
+        Returns:
+            bool: True if connection is successful, False otherwise.
+        """
+        try:
+            for i in range(10):
+                self.wlan.connect(ssid=self._SSID, key=self._PASS)
+                time.sleep(5)
+                if self.wlan.isconnected():
+                    return True
 
-        print(f"Connected to network on {self._SSID}")
+        except Exception as e:
+            print(f"Connection failed: {e}")
 
-    def _connect_socket(self):
-        _socket_connected = False
-        while not _socket_connected:
-            try:
+        return False
+
+    def connect_to_socket(self) -> bool:
+        """
+        Attempts to connect to the specified socket server using IP address and port.
+
+        Returns:
+            bool: True if connection is successful, False otherwise.
+        """
+        try:
+            for i in range(10):
                 self._socket.connect((self._IP, self._PORT))
-                _socket_connected = True
                 print(f"Connected to server at {(self._IP, self._PORT)}")
+                return True
 
-            except Exception as e:
-                print(f"Connection failed: {e}")
-                time.sleep(3)
+        except Exception as e:
+            print(f"Connection failed: {e}")
 
-        # Virtual Handshake to verify that server has been connected to:
-        self._socket.sendall(b"Hello From FERB Unit")
-        time.sleep_ms(500)
+        return False
 
-        data = self._socket.recv(1024)
-        time.sleep_ms(500)
+    def send_to_socket(self, buff: bytearray) -> bool:
+        """
+        Sends data to the connected socket server.
 
-        if data != b'ACK':
-            raise Exception(f"Host on {self._IP} sent invalid ACK: {data}")
-        else:
-            print("Acknowledgement from host server recieved!")
+        Args:
+            buff (bytearray): The data to be sent, represented as a bytearray.
 
+        Returns:
+            bool: True if data is successfully sent, False otherwise.
+        """
+        try:
+            self._socket.sendall(buff)  # Send data to the socket server
 
+        except Exception as e:
+            print(f"Error in sending data: {e}")
+            return False
+
+        time.sleep_ms(500)  # Delay for 500 milliseconds
+
+        return True
+
+    def recv_from_socket(self) -> bool:
+        """
+        Receives data from the connected socket server.
+
+        Returns:
+            bool: True if data is successfully received, False otherwise.
+        """
+        try:
+            self._socket.recv(1024)  # Receive data from the socket server
+
+        except Exception as e:
+            print(f"Error in receiving data: {e}")
+            return False
+
+        time.sleep_ms(500)  # Delay for 500 milliseconds
+
+        return True

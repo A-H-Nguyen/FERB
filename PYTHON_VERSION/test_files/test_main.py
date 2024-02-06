@@ -29,6 +29,7 @@ wlan.active(True)
 # ssid = 'NUwave-guest'
 # wlan.connect(ssid=ssid)
 
+
 def _i2c_scan(addr=DEFAULT_ADDRESS) -> None:
     devices = I2C_.scan()
 

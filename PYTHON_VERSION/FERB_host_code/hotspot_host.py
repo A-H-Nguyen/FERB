@@ -28,15 +28,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
                 pixel_value = data[i] | (data[i+1] << 8)
                 temps.append(pixel_value)
 
-                # print(pixel_value, end=' ')
+                print(pixel_value, end=' ')
 
-                # if (i + 2) % 16 == 0:
-                #     print()
+                if (i + 2) % 16 == 0:
+                    print()
 
                 if len(temps) > 63:
+                    print()
                     break
-
-
 
         except Exception as e:
             print(f"Error: {e}")
