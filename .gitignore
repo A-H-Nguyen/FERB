@@ -1,9 +1,11 @@
+.idea/
 .vscode/
 .vs/
 __pycache__/
 
 build/
 pico-*/
+*venv*/
 
 .micropico
 pico_sdk_import.cmake
