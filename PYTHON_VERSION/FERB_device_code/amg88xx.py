@@ -161,3 +161,7 @@ class AMG88XX:
         i2c = self._i2c
         memaddr = _PIXEL_OFFSET
         i2c.readfrom_mem_into(self._address, memaddr, self._buf)
+
+    # Return the bytearray buf
+    def get_buf(self):
+        return self._buf

@@ -7,8 +7,15 @@ grid_size = (8, 8)
 
 
 def map_temperature(value):
-    # Map the temperature value to a color in the range of blue to red
-    return color_rgb(int(value * 255 / 150), 0, 0)  # Reddish colors based on temperature value
+    # Map the temperature value to a color ranging from blue to red
+    if value <= 90:
+        # Map temperatures <= 90 to shades of blue
+        blue_value = int(value * 255 / 90)
+        return color_rgb(0, 0, blue_value)
+    else:
+        # Map temperatures >= 100 to shades of red
+        red_value = int((value - 90) * 255 / (150 - 90))
+        return color_rgb(red_value, 0, 0)
 
 
 def parse_data(data):
@@ -71,6 +78,13 @@ def main():
         except Exception as e:
             print(f"Error: {e}")
             break
+
+        except KeyboardInterrupt as k:
+            print("Server terminated by keyboard interrupt.")
+            connection.close()
+            break
+
+    _socket.close()
 
 
 if __name__ == "__main__":
