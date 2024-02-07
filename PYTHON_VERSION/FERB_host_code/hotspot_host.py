@@ -44,3 +44,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
             print("Server terminated by keyboard interrupt.")
             connection.close()
             break
+
+    _socket.close()
+
