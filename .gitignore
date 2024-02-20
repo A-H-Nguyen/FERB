@@ -10,3 +10,4 @@ pico-*/
 .micropico
 pico_sdk_import.cmake
 *.out
+*.uf2
