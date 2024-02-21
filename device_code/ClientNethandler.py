@@ -14,7 +14,7 @@ class NetHandler:
         _PORT (int): The port number of the socket server.
     """
 
-    def __init__(self, _ssid, _pass, _ip, _port, station_mode: bool = True) -> None:
+    def __init__(self, _ssid, _pass, _ip, _port) -> None:
         """
         Initializes the network handler with SSID, password, IP address, and port.
 
@@ -23,17 +23,17 @@ class NetHandler:
             _pass (str): The password of the Wi-Fi network.
             _ip (str): The IP address of the socket server.
             _port (int): The port number of the socket server.
-            station_mode (bool, optional): Whether to operate in station mode (default) or access point mode.
         """
         self._SSID = _ssid
         self._PASS = _pass
         self._IP = _ip
         self._PORT = _port
 
-        # Create WLAN object in station mode (by default) or access point mode
-        self.wlan = network.WLAN(network.STA_IF if station_mode else network.AP_IF)
+        # Create WLAN object in station mode
+        self.wlan = network.WLAN(network.STA_IF)
 
         self.wlan.active(True)          # Activate WLAN interface
+   
         self._socket = socket.socket()  # Create a socket object
 
     def print_wifi_networks(self):
@@ -46,7 +46,7 @@ class NetHandler:
             print(f"SSID: {net[0]}, RSSI: {net[3]}")
         print(f"\n-------------------------------------\n")
 
-    def connect_to_wifi(self) -> bool:
+    def connect_to_wifi(self) -> str:
         """
         Attempts to connect to the specified Wi-Fi network using SSID and password.
 
@@ -54,16 +54,22 @@ class NetHandler:
             bool: True if connection is successful, False otherwise.
         """
         try:
-            for i in range(10):
-                self.wlan.connect(ssid=self._SSID, key=self._PASS)
-                time.sleep(5)
-                if self.wlan.isconnected():
-                    return True
+            self.wlan.connect(ssid=self._SSID, key=self._PASS)
+            time.sleep(5)
+
+            # for i in range(10):
+            #     self.wlan.connect(ssid=self._SSID, key=self._PASS)
+            #     time.sleep(5)
+            #     if self.wlan.isconnected():
+            #         return True
+            #     else:
+            #         print("\tconnection failed, trying again...")
 
         except Exception as e:
-            print(f"Connection failed: {e}")
+            # print(f"Connection failed: {e}")
+            return f"{e}"
 
-        return False
+        return "Success"
 
     def connect_to_socket(self) -> bool:
         """

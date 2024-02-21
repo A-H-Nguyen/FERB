@@ -2,7 +2,8 @@ import socket
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _socket:
     _HOST = socket.gethostname()
-    _IP = '10.42.0.1'  # taken from ifconfig output
+    _IP = '10.110.85.119'
+    # _IP = '10.42.0.1'  # taken from ifconfig output
     _PORT = 12345
 
     print("Host Name =\t", _HOST)
