@@ -4,7 +4,8 @@ import time
 from amg88xx import AMG88XX        # Import the AMG88XX class
 from ClientNethandler import NetHandler  # Import the NetHandler class
 
-class Ferb:
+
+class FerbDevice:
     def __init__(self, _ssid, _pass, _ip, _port, _grid_eye_addr, _sda, _scl) -> None:
         self._SSID = _ssid
         self._PASS = _pass
@@ -16,16 +17,34 @@ class Ferb:
         self._SCL = machine.Pin(_scl)
         self._I2C_BUS = machine.I2C(0, sda=self._SDA, scl=self._SCL, freq=400000)
 
-        self._NET = NetHandler(self._SSID, self._PASS, self._IP, self._PORT)
+        self._NET = NetHandler()
         self._SENSOR = AMG88XX(self._I2C_BUS)
 
         self._LED = machine.Pin("LED", machine.Pin.OUT)
 
-    def connect_to_wifi(self) -> str: #bool:
-        return self._NET.connect_to_wifi()
+    def print_wifi_networks(self) -> None:
+        self._NET.print_wifi_networks()
+
+    def get_ssid(self):
+        return self._SSID
     
-    def connect_to_socket(self) -> bool:
-        return self._NET.connect_to_socket()
+    def get_password(self):
+        return self._PASS
+    
+    def get_ip(self):
+        return self._IP
+    
+    def get_port(self):
+        return self._PORT
+
+    # def wifi_status(self):
+
+
+    def connect_to_wifi(self, ssid, password) -> bool:
+        return self._NET.connect_to_wifi(ssid, password)
+
+    def connect_to_socket(self, ip, port) -> bool:
+        return self._NET.connect_to_socket(ip, port)
 
     def search_for_i2c_device(self, addr) -> bool:
         """
