@@ -22,10 +22,10 @@ The following was done on a Raspberry Pi 3 Model B+ because we're not made of mo
 or something then your results might vary. Simply install the Raspbian Desktop of your choosing, and use the `nmcli`.
 You might need to run some `systemctl` commands to start the network manager.
 
-Once the network manager is working properly, you can use the following commands:
+Once the network manager is working properly, you can use the `pi_setup.sh` script, or just run the following commands:
 ```Bash
 # Run hotspot:
-sudo nmcli device wifi hotspot ssid ${HOTSPOT_NAME} password ${PASSWORD} ifname wlan0 
+sudo nmcli device wifi hotspot ssid ${HOTSPOT_NAME} password ${HOTSPOT_PASSWORD} ifname wlan0 
 
 # Show the Wi-Fi name and password:
 nmcli dev wifi show-password
