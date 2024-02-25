@@ -12,12 +12,10 @@ class NetHandler:
         """
         Initializes the network handler.
         """
-        # Create WLAN object in station mode
-        self.wlan = network.WLAN(network.STA_IF)
+        self.wlan = network.WLAN(network.STA_IF)  # Create WLAN object in station mode
+        self.wlan.active(True)
 
-        self.wlan.active(True)          # Activate WLAN interface
-   
-        self._socket = socket.socket()  # Create a socket object
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a TCP socket
 
     def print_wifi_networks(self) -> None:
         """
@@ -30,9 +28,21 @@ class NetHandler:
         print(f"\n-------------------------------------\n")
 
     def is_wifi_connected(self):
+        """
+        Checks if the device is connected to a Wi-Fi network.
+
+        Returns:
+            bool: True if connected, False otherwise.
+        """
         return self.wlan.isconnected()
-    
+
     def get_ssid(self):
+        """
+        Gets the SSID of the currently connected Wi-Fi network.
+
+        Returns:
+            str: The SSID.
+        """
         return self.wlan.config('ssid')
 
     def connect_to_wifi(self, ssid, password) -> bool:
@@ -52,74 +62,68 @@ class NetHandler:
 
             if self.wlan.isconnected():
                 return True
-        
+
         except Exception as e:
             print(f"Connection failed: {e}")
-        
+
         return False
 
     def disconnect_wifi(self):
+        """
+        Disconnects from the current Wi-Fi network.
+        """
         self.wlan.disconnect()
 
-    def connect_to_socket(self, ip, port) -> bool:
+    def connect_to_socket(self, ip, port):
         """
         Attempts to connect to the specified socket server using IP address and port.
 
         Args:
             ip (str): The IP address of the socket server.
             port (int): The port number of the socket server.
-
-        Returns:
-            bool: True if connection is successful, False otherwise.
         """
         try:
             self._socket.connect((ip, port))
-            print(f"Connected to server at {(ip, port)}")
-            return True
+            time.sleep_ms(250)
 
         except Exception as e:
-            print(f"Connection failed: {e}")
-
-        return False
+            print(f"Error in Connection Attempt: {e}")
 
     def disconnect_socket(self):
+        """
+        Closes the socket connection.
+        """
         self._socket.close()
 
-    def send_to_socket(self, buff: bytearray) -> bool:
+    def send_to_socket(self, buff: bytearray):
         """
         Sends data to the connected socket server.
 
         Args:
             buff (bytearray): The data to be sent, represented as a bytearray.
-
-        Returns:
-            bool: True if data is successfully sent, False otherwise.
         """
         try:
-            self._socket.sendall(buff)  # Send data to the socket server
+            self._socket.sendall(buff) # Send data to the socket server
 
         except Exception as e:
             print(f"Error in sending data: {e}")
-            return False
 
-        time.sleep_ms(500)  # Delay for 500 milliseconds
+        time.sleep_ms(250)
 
-        return True
-
-    def recv_from_socket(self) -> bool:
+    def recv_from_socket(self) -> bytes:
         """
         Receives data from the connected socket server.
 
         Returns:
-            bool: True if data is successfully received, False otherwise.
+            bytes: The received data.
         """
         try:
-            self._socket.recv(1024)  # Receive data from the socket server
+            data = self._socket.recv(1024) # Receive data from the socket server
 
         except Exception as e:
             print(f"Error in receiving data: {e}")
-            return False
+            return b'*err'
 
-        time.sleep_ms(500)  # Delay for 500 milliseconds
+        time.sleep_ms(250)
 
-        return True
+        return data
