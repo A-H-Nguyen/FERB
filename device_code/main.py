@@ -2,6 +2,7 @@ import machine
 import time
 
 from amg88xx import AMG88XX
+from amg88xx import _PIXEL_TEMP_CONVERSION
 from ClientNethandler import NetHandler
 from debug import FerbCLI
 
@@ -15,14 +16,13 @@ SERVER_PORT = 12345      # Arbitrary port number for the server, ensure it's kno
 SDA_PIN = 16
 SCL_PIN = 17
 
-debug_pin = machine.Pin(0, machine.Pin.IN)
+debug_pin = machine.Pin(12, machine.Pin.IN)
+led = machine.Pin("LED", machine.Pin.OUT)
 
 if __name__ == "__main__":
 
     net = NetHandler()
     sensor = AMG88XX(machine.I2C(0, sda=SDA_PIN, scl=SCL_PIN, freq=400000))
-
-    server_conn = False
     
     if debug_pin.value() > 0:
         print("FERB booting in Debug mode...\n")
@@ -33,6 +33,7 @@ if __name__ == "__main__":
     try:
         if debug_mode:
             cli = FerbCLI(sensor=sensor, nethandler=net)
+        
         else:
             print("Check wi-fi connection:")
             if not net.is_wifi_connected():
@@ -41,61 +42,48 @@ if __name__ == "__main__":
             print(f"Connected to wi-fi on {net.get_ssid()}")
 
             net.connect_to_socket(SERVER_IP, SERVER_PORT)
-            net.send_to_socket(bytearray(b'~ack'))
 
         while True:
             if debug_mode:
                 if not cli.handle_input():
                     break
             else:
-                pass
-            # _server_ack = net.recv_from_socket()
-            # print(str(_server_ack))
+                try:
+                    sensor.refresh()
+                    time.sleep_ms(100)
 
-            # if _server_ack == b'*err':
-            #     break
+                    # for row in range(8):
+                    #     print()
+                    #     for col in range(8):
+                    #         print('{:4d}'.format(sensor[row, col]), end='')
+                    # print()
 
-            # print(debug_pin.value())
+                    data = sensor.get_buf()
+                    total = 0
+                    for i in range(0, 128, 2):
+                        total += data[i] | (data[i + 1] << 8)
+                    average = (total / 64) * _PIXEL_TEMP_CONVERSION
 
-            # time.sleep_ms(500)
+                    print(f"Average temp is {average} C\n")
 
+                    if average > 25.0:
+                        led.on()
+                        net.send_to_socket(bytearray(str(average).encode()))
+                        time.sleep_ms(200)
+                    else:
+                        led.off()
 
-        #         if not server_conn:
-        #             net.connect_to_socket(SERVER_IP, SERVER_PORT)
-        #             net.send_to_socket(bytearray(b'~ack'))
-        #             _server_ack = net.recv_from_socket()
-
-        #             print(str(_server_ack))
-
-        #             if b'~' in _server_ack:
-        #                 print(f"Connected to server at {SERVER_IP}:{SERVER_PORT}")
-        #                 # server_conn = True
-        #         break
-            # else:
-            #     try:
-            #         sensor.refresh()
-            #         time.sleep_ms(100)
-            #         net.send_to_socket(sensor.get_buf())
-            #         time.sleep_ms(100)
-            #     except Exception as e:
-            #         print(f"Error: {e}")
-            #         print("Resetting server connection...")
-            #         server_conn = False
-
-            #         temp_bytes = device.read_temps()
-        #         # device.print_temps(temp_bytes)
-        #         device.send_temps(temp_bytes)
-
-
-            #     server_conn = net.connect_to_socket(SERVER_IP, SERVER_PORT)
-            # else:
-            #     print(f"Connected to socker server: {SERVER_IP}")
-
-
-            # break
+                except Exception as e:
+                    break
 
     except Exception as e:
-        print(f"Error: {e}")
+        machine.reset()
 
     except KeyboardInterrupt as k:
+        net.disconnect_socket()
+        time.sleep_ms(200)
+        
+        net.disconnect_wifi()
+        time.sleep_ms(200)
+
         print("Ok, bye")

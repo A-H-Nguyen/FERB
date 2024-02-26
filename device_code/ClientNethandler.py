@@ -127,3 +127,4 @@ class NetHandler:
         time.sleep_ms(250)
 
         return data
+    
