@@ -1,14 +1,14 @@
 import argparse
 import asyncio
+import socket
 
 parser = argparse.ArgumentParser(description='Info for socket server')
 parser.add_argument('--ip', type=str, help='IP Address for Socket Server', required=True)
 parser.add_argument('--port', type=int, help='Port number for Socket Server', required=True)
+parser.add_argument('--debug', type=bool, help='Toggle debug mode on/off', required=False, default=False)
+parser.add_argument('-n', type=int, help='Expected number of FERBs for debugging', required=False, default=1)
 
 args = parser.parse_args()
-
-_IP = args.ip
-_PORT = args.port
 
 
 class FerbProtocol(asyncio.Protocol):
@@ -40,12 +40,29 @@ class FerbProtocol(asyncio.Protocol):
         self.transport.close()
 
 
-async def main():
+class DebugServer:
+    def __init__(self, ip: str, port: int, num_conns: int) -> None:
+        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server.bind((args.ip, args.port))
+
+        print(f"TCP server is listening on {args.ip}:{args.port}...\n")
+
+        self.server.listen(num_conns)
+        connection, client_address = self.server.accept()
+        print(f"Connection established with {client_address}")
+
+
+    def send_msg(self):
+        msg = input("Message: ")
+        self.server.sendall(msg.encode())
+
+
+async def main(protocol_class):
     # Get the current event loop
     loop = asyncio.get_running_loop()
 
     # Create a TCP server using the loop and the protocol class
-    server = await loop.create_server(FerbProtocol, _IP, _PORT)
+    server = await loop.create_server(protocol_class, args.ip, args.port)
 
     # Get the server address and port
     addr = server.sockets[0].getsockname()
@@ -57,15 +74,25 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        if args.debug:
+            server = DebugServer(args.ip, args.port, args.n)
+            while True:
+                try:
+                    server.send_msg()
+                except Exception as e:
+                    print(f"Error: {e}")
+                    break
+        else:
+            asyncio.run(main(FerbProtocol))
+        
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
 
 #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
-#         s.bind((_IP, _PORT))
+#         s.bind((args.ip, args.port))
 
-#         print(f"TCP server is listening on {(_IP, _PORT)}...\n")
+#         print(f"TCP server is listening on {(args.ip, args.port)}...\n")
 
 #         s.listen(1)
 #         connection, client_address = s.accept()

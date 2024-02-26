@@ -9,8 +9,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((_IP, _PORT))
     while True:
         try:
-            s.sendall(b'>Hi')
-            sleep(1)
+            msg = s.recv(1024)
+            print(msg)
+            # s.sendall(b'>Hi')
+            # sleep(1)
         except KeyboardInterrupt as k:
             print("See ya!")
             break
