@@ -4,11 +4,10 @@ import asyncio
 parser = argparse.ArgumentParser(description='Info for socket server')
 parser.add_argument('--ip', type=str, help='IP Address for Socket Server', required=True)
 parser.add_argument('--port', type=int, help='Port number for Socket Server', required=True)
-# parser.add_argument('--debug', type=bool, help='Toggle debug mode on/off', required=False, default=False)
-# parser.add_argument('-n', type=int, help='Expected number of FERBs for debugging', required=False, default=1)
 
 args = parser.parse_args()
 
+# NOTE! This demo does not support debugging
 
 class FerbProtocol(asyncio.Protocol):
     # This method is called when a new client connection is established
@@ -22,53 +21,21 @@ class FerbProtocol(asyncio.Protocol):
 
     # This method is called when data is received from the client
     def data_received(self, data):
-        # Decode the data from bytes to string
-        msg = data.decode()
-        print(f"Data received from {self.peername}:\tFlag={msg[0]}")
-        
-        # Check data flag (first byte of message)
-        # If first byte is '~' then the FERB is in debug mode and is awaiting a command
-        if msg[0] == '~':
-            self.debug_cmd()
-  
-        # If first byte is '>' then FERB is in debug mode and is sending cmd output
-        elif data[0] == '>':
-            print(f"{msg}")
+        print(f"Data received from {self.peername}:")
 
-        # If the first byte is '$' then FERB is in normal mode and is sending Grid-EYE data
-        elif msg[0] == '$':
-            print("Grid-EYE reading received:")
-            self.parse_grid_eye(data=data[1][-1])
+        # Decode the data from bytes to float
+        temperature = float(data.decode())
+        if temperature > 25.0:
+            print(f"\tPerson detected\n")
+        else:
+            print("Ingore\n")
+
     
     # This method is called when the client connection is closed
     def connection_lost(self, exc):
         print(f"Connection with {self.peername} closed")
         # Close the transport
         self.transport.close()
-
-    # Handle sending debug commands to the FERB in debug mode. 
-    # NOTE: Currently, the server can only manage debugging one FERB at a time
-    def debug_cmd(self):
-        cmd = input("CMD ~ ")
-        self.transport.write(cmd.encode())
-
-        if cmd == 'q' or cmd == 'quit':
-            self.transport.close()
-
-    def parse_grid_eye(self, data):
-        temps = []
-        for i in range(0, len(data), 2):
-            pixel_value = data[i] | (data[i+1] << 8)
-            temps.append(pixel_value)
-
-            print(pixel_value, end=' ')
-
-            if (i + 2) % 16 == 0:
-                print()
-
-            if len(temps) > 63:
-                print()
-                break
 
 
 async def main(protocol_class):
