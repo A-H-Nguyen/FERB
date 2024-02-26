@@ -1,6 +1,4 @@
 import argparse
-import socket
-# import threading
 import asyncio
 
 parser = argparse.ArgumentParser(description='Info for socket server')
@@ -19,42 +17,27 @@ class FerbProtocol(asyncio.Protocol):
         # Save a reference to the transport object
         self.transport = transport
         # Get the peer name of the client
-        peername = transport.get_extra_info("peername")
+        self.peername = transport.get_extra_info("peername")
         # Print a message
-        print(f"Connection from {peername}")
+        print(f"Connection from {self.peername}")
 
     # This method is called when data is received from the client
     def data_received(self, data):
         # Decode the data from bytes to string
         message = data.decode()
-        # Print a message
-        print(f"Data received: {message}")
-        # Send back the same data to the client
-        # self.transport.write(data)
-        # # Print a message
-        # print(f"Data sent: {message}")
+        print(f"Data received from {self.peername}")
+        
+        # Check data flag (first byte of message)
+        if message[0] == '~':
+            print(f"idk: {message}")
+        elif message[0] == '>':
+            print("Grid-EYE reading received")
 
     # This method is called when the client connection is closed
     def connection_lost(self, exc):
-        # Print a message
-        print("Connection closed")
+        print(f"Connection with {self.peername} closed")
         # Close the transport
         self.transport.close()
-
-
-# async def FerbProtocol(reader, writer):
-#     data = await reader.read(100)
-#     message = data.decode()
-#     addr = writer.get_extra_info('peername')
-
-#     print(f'Received {message} from {addr}')
-
-#     print(f'Send: {message}')
-#     writer.write(data)
-#     await writer.drain()
-
-#     if message == '~close':
-#         writer.close()
 
 
 async def main():
@@ -62,7 +45,7 @@ async def main():
     loop = asyncio.get_running_loop()
 
     # Create a TCP server using the loop and the protocol class
-    server = await loop.start_server(FerbProtocol, _IP, _PORT)
+    server = await loop.create_server(FerbProtocol, _IP, _PORT)
 
     # Get the server address and port
     addr = server.sockets[0].getsockname()
@@ -73,17 +56,10 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
-
-# def handle_client(c):
-#     message = c.recv(1024)
-#     print('Received:', message)
-#     c.send(b'Echo:' + message)
-#     c.close()
-
-
-# if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt as k:
+        print("\nGoodbye cruel world\n")
 
 #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
