@@ -1,96 +1,69 @@
+import asyncio
 import random
 
 from graphics import *
-
-# Define the size of the thermal image grid (8x8 for Grid-EYE)
-grid_size = (8, 8)
+from server_base import FerbProtocol, Server
 
 
-def map_temperature(value):
-    # Map the temperature value to a color ranging from blue to red
-    if value <= 90:
-        # Map temperatures <= 90 to shades of blue
-        blue_value = int(value * 255 / 90)
-        return color_rgb(0, 0, blue_value)
-    else:
-        # Map temperatures >= 100 to shades of red
-        red_value = int((value - 90) * 255 / (150 - 90))
-        return color_rgb(red_value, 0, 0)
+class ThermalCam:
+    def __init__(self) -> None:
+        # Define the size of the thermal image grid (8x8 for Grid-EYE)
+        # self.grid_size = (8, 8)
+        self.win = GraphWin("Thermal Image", 400, 400)
+
+    def map_temperature(self, value):
+        if value < 0:
+            return color_rgb(0, 0, 0)  # Black for negative temperatures
+        elif value >= 50:
+            return color_rgb(255, 0, 0)  # Bright red for temperatures >= 50
+        else:
+            # Map temperatures from 0 to 50 degrees Celsius to varying shades of red
+            red_value = int(value * 255 / 50)  # Scale value to range [0, 255]
+            return color_rgb(red_value, 0, 0)
+
+    def generate_data(self):
+        return [random.randint(0, 30) for _ in range(64)]
+
+    def draw_thermal_image(self, temps):
+        # Draw squares to represent each pixel of the thermal image
+        for row in range(8):
+            for col in range(8):
+                temp = temps[row * 8 + col]  # Get temperature value for current pixel
+                color = self.map_temperature(temp)
+                rect = Rectangle(Point(col * 50, row * 50), 
+                                 Point((col + 1) * 50, (row + 1) * 50))
+                rect.setFill(color)
+                rect.draw(self.win)
 
 
-# def parse_data(data):
-    # Parse the received data into a list of temperature values
-    # temps = []
-    # for i in range(0, len(data), 2):
-    #     pixel_value = data[i] | (data[i + 1] << 8)
-    #     temps.append(pixel_value)
-    # return temps
+class ThermalCamProtocol(FerbProtocol):
+    def __init__(self):
+        self.wait_timer = None
+        self.TIME_LIMIT = 5
 
+        self.cam = ThermalCam()
 
-def generate_data():
-    return [random.randint(0, 100) for _ in range(64)]
+    def data_received(self, data):
+        self.handle_data(data)
+        
+        self.cancel_wait_timer()  # Cancel current wait timer
+        self.start_wait_timer()  # Restart wait timer upon receiving data
 
+    def handle_data(self, data):
+        temps = [(data[i] | (data[i + 1] << 8)) * 0.25 for i in range(0, len(data), 2)]
 
-
-def draw_thermal_image(win, temps):
-    # Draw squares to represent each pixel of the thermal image
-    for row in range(8):
-        for col in range(8):
-            temp = temps[row * 8 + col]  # Get temperature value for current pixel
-            color = map_temperature(temp)
-            rect = Rectangle(Point(col * 50, row * 50), Point((col + 1) * 50, (row + 1) * 50))
-            rect.setFill(color)
-            rect.draw(win)
-
-
-def main():
-    # _socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # _HOST = socket.gethostname()
-    # _IP = '10.42.0.1'  # taken from ifconfig output
-    # _PORT = 12345
-
-    # print("Host Name =\t", _HOST)
-    # print("Host IP =\t", _IP)
-
-    # _socket.bind((_IP, _PORT))
-
-    # print(f"TCP server is listening on {(_IP, _PORT)}...\n")
-
-    # _socket.listen(1)
-    # connection, client_address = _socket.accept()
-    # print(f"Connection established with {client_address}")
-
-    win = GraphWin("Thermal Image", 400, 400)
-
-    while True:
-        # try:
-        #     # Receive data from the client
-        #     data = connection.recv(128)  # Adjust buffer size as needed
-        #     if not data:
-        #         raise Exception("Connection closed by client.")
-
-        #     # Parse the received data into temperature values
-        #     temps = parse_data(data)
-
-        draw_thermal_image(win, generate_data())
-
-        # Check if the user clicked the mouse to exit
-        if win.checkMouse():
-            # connection.close()
-            win.close()
-            break
-
-    #     except Exception as e:
-    #         print(f"Error: {e}")
-    #         break
-
-    #     except KeyboardInterrupt as k:
-    #         print("Server terminated by keyboard interrupt.")
-    #         connection.close()
-    #         break
-
-    # _socket.close()
+        self.cam.draw_thermal_image(temps)
+    
+    def connection_lost(self, exc):
+        print(f"Connection with {self.peername} closed")
+        self.cam.win.close()
+        self.cancel_wait_timer()  # Cancel wait timer when connection is lost
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        server = Server()
+        asyncio.run(server.ferb_main(ThermalCamProtocol))
+        
+    except KeyboardInterrupt as k:
+        print("\nGoodbye cruel world\n")
