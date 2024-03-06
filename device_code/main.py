@@ -38,50 +38,59 @@ if __name__ == "__main__":
         
         else:
             print("Check wi-fi connection:")
+            
             if not net.is_wifi_connected():
-                if not net.connect_to_wifi(HOST_SSID, HOST_PASS):
+                print(f"Attempting to connect to {HOST_SSID} ...")
+                
+                if not net.connect_to_wifi(10, HOST_SSID, HOST_PASS):
                     raise Exception(f"Could not connect to wi-fi on {HOST_SSID}")
-            print(f"Connected to wi-fi on {net.get_ssid()}")
-
+            
+            print(f"Successfully connected to {net.get_ssid()}\n")
+            print(f"Attempting to connect to socket {SERVER_IP}:{SERVER_PORT} ...")
+            
             net.connect_to_socket(SERVER_IP, SERVER_PORT)
+                        
+            print(f"Socket connection successful\n")
 
         while True:
             if debug_mode:
-                # if not cli.handle_input():
-                #     break
-                pass
-            else:
-                try:
-                    sensor.refresh()
-                    time.sleep_ms(1000)
-
-                    for row in range(8):
-                        print()
-                        for col in range(8):
-                            print('{:4d}'.format(sensor[row, col]), end='')
-                    print("\n-------------------------")
-
-                    data = sensor.get_buf()
-                    net.send_to_socket(data)
-                    # total = 0
-                    # for i in range(0, 128, 2):
-                    #     total += data[i] | (data[i + 1] << 8)
-                    # average = (total / 64) * _PIXEL_TEMP_CONVERSION
-
-                    # print(f"Average temp is {average} C\n")
-
-                    # if average > 22.0:
-                    #     led.on()
-                    #     net.send_to_socket(bytearray(str(average).encode()))
-                    #     time.sleep_ms(200)
-                    # else:
-                    #     led.off()
-
-                except Exception as e:
+                if not cli.handle_input():
                     break
+            else:
+                sensor.refresh() # Tell Grid-EYE to read data
+                
+                time.sleep_ms(100)
+
+                ### Print Grid-EYE reading as grid:
+                # for row in range(8):
+                #     print()
+                #     for col in range(8):
+                #         print('{:4d}'.format(sensor[row, col]), end='')
+                # print("\n-------------------------")
+
+                data = sensor.get_buf()
+                net.send_to_socket(data)
+
+                ### Calculating Average Temp:
+                # total = 0
+                # for i in range(0, 128, 2):
+                #     total += data[i] | (data[i + 1] << 8)
+                # average = (total / 64) * _PIXEL_TEMP_CONVERSION
+
+                # print(f"Average temp is {average} C\n")
+
+                ### Rudimentary Person detection:
+                # if average > 22.0:
+                #     led.on()
+                #     net.send_to_socket(bytearray(str(average).encode()))
+                #     time.sleep_ms(200)
+                # else:
+                #     led.off()
 
     except Exception as e:
-        machine.reset()
+        print(f"Error: {e}")
+        time.sleep(2)
+        # machine.reset()
 
     except KeyboardInterrupt as k:
         net.disconnect_socket()
