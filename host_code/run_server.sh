@@ -11,5 +11,5 @@ else
 
     echo "Running server: ${SERVER_PATH}"
 
-    python $SERVER_PATH --ip $IP --port $PORT
+    python3 $SERVER_PATH --ip $IP --port $PORT
 fi
