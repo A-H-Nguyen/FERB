@@ -1,4 +1,4 @@
-import socket
+import random
 
 from graphics import *
 
@@ -18,13 +18,18 @@ def map_temperature(value):
         return color_rgb(red_value, 0, 0)
 
 
-def parse_data(data):
+# def parse_data(data):
     # Parse the received data into a list of temperature values
-    temps = []
-    for i in range(0, len(data), 2):
-        pixel_value = data[i] | (data[i + 1] << 8)
-        temps.append(pixel_value)
-    return temps
+    # temps = []
+    # for i in range(0, len(data), 2):
+    #     pixel_value = data[i] | (data[i + 1] << 8)
+    #     temps.append(pixel_value)
+    # return temps
+
+
+def generate_data():
+    return [random.randint(0, 100) for _ in range(64)]
+
 
 
 def draw_thermal_image(win, temps):
@@ -39,52 +44,52 @@ def draw_thermal_image(win, temps):
 
 
 def main():
-    _socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    _HOST = socket.gethostname()
-    _IP = '10.42.0.1'  # taken from ifconfig output
-    _PORT = 12345
+    # _socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # _HOST = socket.gethostname()
+    # _IP = '10.42.0.1'  # taken from ifconfig output
+    # _PORT = 12345
 
-    print("Host Name =\t", _HOST)
-    print("Host IP =\t", _IP)
+    # print("Host Name =\t", _HOST)
+    # print("Host IP =\t", _IP)
 
-    _socket.bind((_IP, _PORT))
+    # _socket.bind((_IP, _PORT))
 
-    print(f"TCP server is listening on {(_IP, _PORT)}...\n")
+    # print(f"TCP server is listening on {(_IP, _PORT)}...\n")
 
-    _socket.listen(1)
-    connection, client_address = _socket.accept()
-    print(f"Connection established with {client_address}")
+    # _socket.listen(1)
+    # connection, client_address = _socket.accept()
+    # print(f"Connection established with {client_address}")
 
     win = GraphWin("Thermal Image", 400, 400)
 
     while True:
-        try:
-            # Receive data from the client
-            data = connection.recv(128)  # Adjust buffer size as needed
-            if not data:
-                raise Exception("Connection closed by client.")
+        # try:
+        #     # Receive data from the client
+        #     data = connection.recv(128)  # Adjust buffer size as needed
+        #     if not data:
+        #         raise Exception("Connection closed by client.")
 
-            # Parse the received data into temperature values
-            temps = parse_data(data)
+        #     # Parse the received data into temperature values
+        #     temps = parse_data(data)
 
-            draw_thermal_image(win, temps)
+        draw_thermal_image(win, generate_data())
 
-            # Check if the user clicked the mouse to exit
-            if win.checkMouse():
-                connection.close()
-                win.close()
-                break
-
-        except Exception as e:
-            print(f"Error: {e}")
+        # Check if the user clicked the mouse to exit
+        if win.checkMouse():
+            # connection.close()
+            win.close()
             break
 
-        except KeyboardInterrupt as k:
-            print("Server terminated by keyboard interrupt.")
-            connection.close()
-            break
+    #     except Exception as e:
+    #         print(f"Error: {e}")
+    #         break
 
-    _socket.close()
+    #     except KeyboardInterrupt as k:
+    #         print("Server terminated by keyboard interrupt.")
+    #         connection.close()
+    #         break
+
+    # _socket.close()
 
 
 if __name__ == "__main__":
