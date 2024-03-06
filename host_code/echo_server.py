@@ -1,6 +1,6 @@
 import asyncio
 
-from server_base import CLI, FerbProtocol, ferb_main
+from server_base import FerbProtocol, Server
 
 
 class EchoProtocol(FerbProtocol):
@@ -9,10 +9,9 @@ class EchoProtocol(FerbProtocol):
 
 
 if __name__ == "__main__":
-    cli = CLI()
-
     try:
-        asyncio.run(ferb_main(EchoProtocol, cli.get_ip(), cli.get_port()))
+        server = Server()
+        asyncio.run(server.ferb_main(EchoProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")

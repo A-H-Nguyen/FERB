@@ -68,24 +68,30 @@ class FerbProtocol(asyncio.Protocol):
         self.transport.close()  # Close connection on timeout
 
 
-async def ferb_main(protocol_class, _ip, _port):
-    # Get the current event loop
-    loop = asyncio.get_running_loop()
+class Server:
+    def __init__(self) -> None:
+        self.cli = CLI()
+    
+    async def ferb_main(self, protocol_class):
+        # Get the current event loop
+        loop = asyncio.get_running_loop()
 
-    # Create a TCP server using the loop and the protocol class
-    server = await loop.create_server(protocol_class, _ip, _port)
+        # Create a TCP server using the loop and the protocol class
+        server = await loop.create_server(protocol_class, 
+                                          self.cli.get_ip(), self.cli.get_port())
 
-    # Get the server address and port
-    addr = server.sockets[0].getsockname()
-    print(f'Serving on {addr}')
+        # Get the server address and port
+        addr = server.sockets[0].getsockname()
+        print(f'Serving on {addr}')
 
-    async with server:
-        await server.serve_forever()
+        async with server:
+            await server.serve_forever()
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(ferb_main(FerbProtocol, _DEFAULT_IP, _DEFAULT_PORT))
+        server = Server()
+        asyncio.run(server.ferb_main(FerbProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
