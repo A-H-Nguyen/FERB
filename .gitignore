@@ -5,7 +5,7 @@ __pycache__/
 
 build/
 pico-*/
-*venv*/
+ferb_env/
 
 .micropico
 pico_sdk_import.cmake
