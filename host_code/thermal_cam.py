@@ -11,15 +11,57 @@ class ThermalCam:
         # self.grid_size = (8, 8)
         self.win = GraphWin("Thermal Image", 400, 400)
 
+    def lerp_color(self, color1, color2, t):
+        # Linear interpolation between two colors
+        r = int(color1[0] * (1 - t) + color2[0] * t)
+        g = int(color1[1] * (1 - t) + color2[1] * t)
+        b = int(color1[2] * (1 - t) + color2[2] * t)
+        return (r, g, b)
+
     def map_temperature(self, value):
-        if value < 0:
-            return color_rgb(0, 0, 0)  # Black for negative temperatures
-        elif value >= 50:
-            return color_rgb(255, 0, 0)  # Bright red for temperatures >= 50
+        # Define color gradients for different temperature ranges
+        blue_color = (0, 0, 255)
+        green_color = (0, 255, 0)
+        yellow_color = (255, 255, 0)
+        red_color = (255, 0, 0)
+        
+        normalize_bound = 22
+
+        if value < normalize_bound:
+            # Linear interpolation between blue and green based on temperature
+            t = value / normalize_bound  # Normalize temperature to the range [0, 1]
+            new_color = (self.lerp_color(blue_color, green_color, t))
+        
+        # elif value < normalize_bound + 20:
+        #     # Linear interpolation between green and yellow based on temperature
+        #     t = (40-value) / (normalize_bound + 20)
+        #     new_color = self.lerp_color(green_color, yellow_color, t)
+        
+        elif value < normalize_bound + 3:
+            # Linear interpolation between yellow and red based on temperature
+            t = (normalize_bound + 3 - value) / (normalize_bound + 3)
+            new_color = self.lerp_color(yellow_color, red_color, t)
+        
         else:
-            # Map temperatures from 0 to 50 degrees Celsius to varying shades of red
-            red_value = int(value * 255 / 50)  # Scale value to range [0, 255]
-            return color_rgb(red_value, 0, 0)
+            new_color = red_color
+        
+        return color_rgb(*new_color)
+
+
+    # def map_temperature(self, value):
+    #     val_scaled = value * 0.25
+
+    #     red_val = int((val_scaled * 255) / 50)
+        
+    #     blue_val = int(255 - val_scaled)
+
+    #     if red_val > 255:
+    #         red_val = 255
+
+    #     if blue_val < 0:
+    #         blue_val = 0
+
+    #     return color_rgb(red_val, 0, blue_val)
 
     def generate_data(self):
         return [random.randint(0, 30) for _ in range(64)]
