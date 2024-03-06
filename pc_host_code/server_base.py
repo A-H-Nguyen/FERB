@@ -1,82 +1,79 @@
 import argparse
 import asyncio
 
-parser = argparse.ArgumentParser(description='Info for socket server')
-parser.add_argument('--ip', type=str, help='IP Address for Socket Server', required=True)
-parser.add_argument('--port', type=int, help='Port number for Socket Server', required=True)
 
-args = parser.parse_args()
+_DEFAULT_IP = '10.42.0.1'
+_DEFAULT_PORT = 11111
+
+
+class CLI:
+    def __init__(self) -> None:
+        self.parser = argparse.ArgumentParser(description='Info for socket server')
+        self.parser.add_argument('--ip', type=str, 
+                                 help='IP Address for Socket Server')
+        self.parser.add_argument('--port', type=int, 
+                                 help='Port number for Socket Server')
+        
+        try:
+            self.args = self.parser.parse_args()
+            if not (self.args.ip and self.args.port):
+                raise argparse.ArgumentError(None, "Both IP address and port are required.")
+        
+        except argparse.ArgumentError as e:
+            self.parser.error(str(e))
+
+    def get_ip(self) -> str:
+        return self.args.ip
+    
+    def get_port(self) -> int:
+        return self.args.port
 
 
 class FerbProtocol(asyncio.Protocol):
-    # This method is called when a new client connection is established
+    def __init__(self):
+        self.wait_timer = None
+        self.TIME_LIMIT = 5
+
     def connection_made(self, transport):
-        # Save a reference to the transport object
         self.transport = transport
-        # Get the peer name of the client
         self.peername = transport.get_extra_info("peername")
-        # Print a message
         print(f"Connection from {self.peername}")
+        self.start_wait_timer()  # Start wait timer when connection is made
 
-    # This method is called when data is received from the client
+    def start_wait_timer(self):
+        self.wait_timer = asyncio.get_event_loop().call_later(self.TIME_LIMIT, 
+                                                              self.timeout)
+
+    def cancel_wait_timer(self):
+        if self.wait_timer is not None:
+            self.wait_timer.cancel()
+
     def data_received(self, data):
-        # Decode the data from bytes to string
-        msg = data.decode()
-        # print(f"Data received from {self.peername}:\tFlag={msg[0]}")
+        print(f"Data received from {self.peername}")
         
-        # # Check data flag (first byte of message)
-        # # If first byte is '~' then the FERB is in debug mode and is awaiting a command
-        if msg[0] == '~':
-        #     self.debug_cmd()
-            pass
-  
-        # # If first byte is '>' then FERB is in debug mode and is sending cmd output
-        elif msg[0] == '>':
-        #     print(f"{msg}")
-            pass
+        self.handle_data(data)
+        
+        self.cancel_wait_timer()  # Cancel current wait timer
+        self.start_wait_timer()  # Restart wait timer upon receiving data
 
-        # Otherwise, FERB is in normal mode and is sending Grid-EYE data
-        else:
-            print("Grid-EYE reading received:")
-            self.parse_grid_eye(data)
-    
-    # This method is called when the client connection is closed
+    def handle_data(self, data):
+        pass
+
     def connection_lost(self, exc):
         print(f"Connection with {self.peername} closed")
-        # Close the transport
-        self.transport.close()
+        self.cancel_wait_timer()  # Cancel wait timer when connection is lost
 
-    # Handle sending debug commands to the FERB in debug mode. 
-    # NOTE: Currently, the server can only manage debugging one FERB at a time
-    def debug_cmd(self):
-        cmd = input("CMD ~ ")
-        self.transport.write(cmd.encode())
-
-        if cmd == 'q' or cmd == 'quit':
-            self.transport.close()
-
-    # def parse_grid_eye(self, data):
-    #     temps = []
-    #     for i in range(0, len(data), 2):
-    #         pixel_value = data[i] | (data[i+1] << 8)
-    #         temps.append(pixel_value)
-
-    #         print(pixel_value, end=' ')
-
-    #         if (i + 2) % 16 == 0:
-    #             print()
-
-    #         if len(temps) > 63:
-    #             print()
-    #             break
+    def timeout(self):
+        print("Timeout: No data received within the specified time")
+        self.transport.close()  # Close connection on timeout
 
 
-async def main(protocol_class):
+async def ferb_main(protocol_class, _ip, _port):
     # Get the current event loop
     loop = asyncio.get_running_loop()
 
     # Create a TCP server using the loop and the protocol class
-    server = await loop.create_server(protocol_class, args.ip, args.port)
+    server = await loop.create_server(protocol_class, _ip, _port)
 
     # Get the server address and port
     addr = server.sockets[0].getsockname()
@@ -88,7 +85,7 @@ async def main(protocol_class):
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main(FerbProtocol))
+        asyncio.run(ferb_main(FerbProtocol, _DEFAULT_IP, _DEFAULT_PORT))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
