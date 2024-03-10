@@ -105,7 +105,7 @@ class ThermalCamProtocol(FerbProtocol):
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.ferb_main(ThermalCamProtocol))
+        asyncio.run(server.start_server(ThermalCamProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")

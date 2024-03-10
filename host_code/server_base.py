@@ -38,6 +38,7 @@ class FerbProtocol(asyncio.Protocol):
         self.transport = transport
         self.peername = transport.get_extra_info("peername")
         print(f"Connection from {self.peername}")
+
         self.start_wait_timer()  # Start wait timer when connection is made
 
     def start_wait_timer(self):
@@ -51,7 +52,7 @@ class FerbProtocol(asyncio.Protocol):
     def data_received(self, data):
         print(f"Data received from {self.peername}")
         
-        self.handle_data(data)
+        self.handle_data(data[:128])
         
         self.cancel_wait_timer()  # Cancel current wait timer
         self.start_wait_timer()  # Restart wait timer upon receiving data
@@ -72,7 +73,7 @@ class Server:
     def __init__(self) -> None:
         self.cli = CLI()
     
-    async def ferb_main(self, protocol_class):
+    async def start_server(self, protocol_class):
         # Get the current event loop
         loop = asyncio.get_running_loop()
 
@@ -91,7 +92,7 @@ class Server:
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.ferb_main(FerbProtocol))
+        asyncio.run(server.start_server(FerbProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")

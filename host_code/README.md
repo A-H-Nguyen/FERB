@@ -59,7 +59,9 @@ Don't use this one - it is not updated and should be deprecated.
 
 ### Echo Server:
 Implements a simple "echo" function by printing out whatever data it receives onto the terminal.
-It might help to change the FERBware to send a simple byte string to the server, instead of the Grid-EYE output, in order to use this server.
+This server removes the wait timer implementation.
+
+If you are not using the FERB Debug mode CLI, it might help to change the FERBware to send a simple byte string to the server, instead of the Grid-EYE output, in order to use this server.
 
 ### Grid-EYE Printer:
 Print out the received Grid-EYE data as a matrix of temperature values in Celcius.

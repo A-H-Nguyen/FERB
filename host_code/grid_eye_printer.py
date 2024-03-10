@@ -18,7 +18,7 @@ class GridEyeProtocol(FerbProtocol):
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.ferb_main(GridEyeProtocol))
+        asyncio.run(server.start_server(GridEyeProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
