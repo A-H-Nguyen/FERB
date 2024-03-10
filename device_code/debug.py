@@ -1,7 +1,7 @@
 import time
 
-from amg88xx import AMG88XX        # Import the AMG88XX class
-from ClientNethandler import NetHandler  # Import the NetHandler class
+from amg88xx import AMG88XX
+from ClientNethandler import NetHandler
 
 class FerbCLI:
     """
@@ -98,12 +98,11 @@ class FerbCLI:
             self.sensor.refresh()
             time.sleep_ms(100)
 
-            data = self.sensor.get_buf()
-            for i in range(0, len(data), 2):
-                pixel_value = data[i] | (data[i + 1] << 8)
-                print(pixel_value, end=' ')
-                if (i + 2) % 16 == 0:
-                    print()
+            for row in range(8):
+                print()
+                for col in range(8):
+                    print('{:4d}'.format(self.sensor[row, col]), end='')
+            print("\n-------------------------")
 
         elif user_input == '8':
             print("Sending Grid-EYE Reading to host...")
@@ -113,6 +112,6 @@ class FerbCLI:
             time.sleep_ms(100)
         
         else:
-            print("Invalid command. Please enter a valid command from the provided list.")
+            print("Invalid command.")
         
         return True
