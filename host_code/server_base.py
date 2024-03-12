@@ -6,6 +6,7 @@ import datetime
 _DEFAULT_IP = '10.42.0.1'
 _DEFAULT_PORT = 11111
 
+PIXEL_TEMP_CONVERSION = 0.25
 
 class CLI:
     def __init__(self) -> None:

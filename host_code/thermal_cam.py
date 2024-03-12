@@ -1,79 +1,43 @@
 import asyncio
-import random
+import numpy as np
 
 from graphics import *
-from server_base import FerbProtocol, Server
+from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
+from scipy.interpolate import RegularGridInterpolator
 
+
+_GRID_LEN = 8
+_INTRP_LEN = 16
+_RESOLUTION = 400
 
 class ThermalCam:
     def __init__(self) -> None:
         # Define the size of the thermal image grid (8x8 for Grid-EYE)
-        # self.grid_size = (8, 8)
-        self.win = GraphWin("Thermal Image", 400, 400)
-
-    def lerp_color(self, color1, color2, t):
-        # Linear interpolation between two colors
-        r = int(color1[0] * (1 - t) + color2[0] * t)
-        g = int(color1[1] * (1 - t) + color2[1] * t)
-        b = int(color1[2] * (1 - t) + color2[2] * t)
-        return (r, g, b)
+        self.win = GraphWin("Thermal Image", _RESOLUTION, _RESOLUTION)
 
     def map_temperature(self, value):
-        # Define color gradients for different temperature ranges
-        blue_color = (0, 0, 255)
-        green_color = (0, 255, 0)
-        yellow_color = (255, 255, 0)
-        red_color = (255, 0, 0)
-        
-        normalize_bound = 22
+        # Define colors for different temperature ranges
+        ambient_temp = 22
+        person_temp = 23
 
-        if value < normalize_bound:
-            # Linear interpolation between blue and green based on temperature
-            t = value / normalize_bound  # Normalize temperature to the range [0, 1]
-            new_color = (self.lerp_color(blue_color, green_color, t))
+        if value < ambient_temp:            
+            return color_rgb(0, 255, 0) # green
         
-        # elif value < normalize_bound + 20:
-        #     # Linear interpolation between green and yellow based on temperature
-        #     t = (40-value) / (normalize_bound + 20)
-        #     new_color = self.lerp_color(green_color, yellow_color, t)
-        
-        elif value < normalize_bound + 3:
-            # Linear interpolation between yellow and red based on temperature
-            t = (normalize_bound + 3 - value) / (normalize_bound + 3)
-            new_color = self.lerp_color(yellow_color, red_color, t)
+        elif value > person_temp:
+            return color_rgb(255, 0, 0) # red
         
         else:
-            new_color = red_color
-        
-        return color_rgb(*new_color)
-
-
-    # def map_temperature(self, value):
-    #     val_scaled = value * 0.25
-
-    #     red_val = int((val_scaled * 255) / 50)
-        
-    #     blue_val = int(255 - val_scaled)
-
-    #     if red_val > 255:
-    #         red_val = 255
-
-    #     if blue_val < 0:
-    #         blue_val = 0
-
-    #     return color_rgb(red_val, 0, blue_val)
-
-    def generate_data(self):
-        return [random.randint(0, 30) for _ in range(64)]
+            return color_rgb(255, 255, 0) # yellow
 
     def draw_thermal_image(self, temps):
+        length, width = temps.shape
+
         # Draw squares to represent each pixel of the thermal image
-        for row in range(8):
-            for col in range(8):
-                temp = temps[row * 8 + col]  # Get temperature value for current pixel
-                color = self.map_temperature(temp)
-                rect = Rectangle(Point(col * 50, row * 50), 
-                                 Point((col + 1) * 50, (row + 1) * 50))
+        for row in range(length):
+            for col in range(width):
+                color = self.map_temperature(temps[row, col])
+                rect = Rectangle(Point(col * (_RESOLUTION/width), row * (_RESOLUTION/length)), 
+                                 Point((col + 1) * (_RESOLUTION/width), (row + 1) * (_RESOLUTION/length)))
                 rect.setFill(color)
                 rect.draw(self.win)
 
@@ -81,21 +45,38 @@ class ThermalCam:
 class ThermalCamProtocol(FerbProtocol):
     def __init__(self):
         self.wait_timer = None
-        self.TIME_LIMIT = 5
+        self.TIME_LIMIT = 10
+
+        # Generate x and y coordinates for the original and interpolated Grid-EYE output
+        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
+        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
+        self.new_X, self.new_Y = np.meshgrid(self.new_coords, self.new_coords)
 
         self.cam = ThermalCam()
 
-    def data_received(self, data):
+    def data_received(self, data): # redefine this to overwrite date-time printing
         self.handle_data(data)
         
         self.cancel_wait_timer()  # Cancel current wait timer
         self.start_wait_timer()  # Restart wait timer upon receiving data
 
     def handle_data(self, data):
-        temps = [(data[i] | (data[i + 1] << 8)) * 0.25 for i in range(0, len(data), 2)]
+        temps_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+        temps_matrix = temps_array.reshape((_GRID_LEN, _GRID_LEN))
+        temps_interp = self.interp(temps_matrix)
 
-        self.cam.draw_thermal_image(temps)
+        self.cam.draw_thermal_image(temps_interp)
     
+    def interp(self, _grid):
+        # Create RegularGridInterpolator
+        interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), _grid)
+
+        # Interpolate values for the new coordinates using RegularGridInterpolator
+        resized_matrix = interp_func((self.new_Y, self.new_X))
+
+        return resized_matrix
+
+
     def connection_lost(self, exc):
         print(f"Connection with {self.peername} closed")
         self.cam.win.close()
