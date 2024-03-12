@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import datetime
 
 
 _DEFAULT_IP = '10.42.0.1'
@@ -32,12 +33,12 @@ class CLI:
 class FerbProtocol(asyncio.Protocol):
     def __init__(self):
         self.wait_timer = None
-        self.TIME_LIMIT = 5
+        self.TIME_LIMIT = 10
 
     def connection_made(self, transport):
         self.transport = transport
         self.peername = transport.get_extra_info("peername")
-        print(f"Connection from {self.peername}")
+        print(f"{datetime.datetime.now()}: Connection from {self.peername}")
 
         self.start_wait_timer()  # Start wait timer when connection is made
 
@@ -50,7 +51,7 @@ class FerbProtocol(asyncio.Protocol):
             self.wait_timer.cancel()
 
     def data_received(self, data):
-        print(f"Data received from {self.peername}")
+        print(f"{datetime.datetime.now()}: Data received from {self.peername}")
         
         self.handle_data(data[:128])
         
@@ -61,11 +62,11 @@ class FerbProtocol(asyncio.Protocol):
         pass
 
     def connection_lost(self, exc):
-        print(f"Connection with {self.peername} closed")
+        print(f"{datetime.datetime.now()}: Connection with {self.peername} closed")
         self.cancel_wait_timer()  # Cancel wait timer when connection is lost
 
     def timeout(self):
-        print("Timeout: No data received within the specified time")
+        print(f"{datetime.datetime.now()}: Connection timeout - No data received")
         self.transport.close()  # Close connection on timeout
 
 
