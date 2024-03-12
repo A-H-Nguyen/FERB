@@ -10,12 +10,14 @@ from scipy.interpolate import RectBivariateSpline
 size = 8
 original_matrix = np.array([[rand.randint(0, 30) for _ in range(size)] for _ in range(size)])
 
+# print(original_matrix)
+
 ###############################################################################
 # These only needs to be called once!
 
 coords = np.linspace(0, 7, size) # Generate x and y coordinates for the original matrix
 
-bicubic_interp = RectBivariateSpline(coords, coords, original_matrix.T) # create interp func
+bicubic_interp = RectBivariateSpline(coords, coords, original_matrix) # create interp func
 
 ###############################################################################
 
@@ -27,13 +29,11 @@ def interp(new_size: int):
     # start_time = time.time()
 
     # Perform bicubic interpolation to get the values for the new matrix
-    new_matrix = bicubic_interp(new_coords, new_coords).T
+    new_matrix = bicubic_interp(new_coords, new_coords)
 
     # elapsed_time = time.time() - start_time
-
     # print(f"*** Interpolation for {new_size}-pixel grid\n", 
     #       f" * Elapsed time: {elapsed_time} seconds\n")
-
 
     # print(f"{new_matrix}\n-----------------------------------------")
 
