@@ -1,51 +1,53 @@
-# DELETE ME LATER!
+# # DELETE ME LATER!
 import datetime
-import random as rand
 import numpy as np
 import time
 
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RegularGridInterpolator
 
-# Original matrix
+# Define original matrix size and new size
 size = 8
-original_matrix = np.array([[rand.randint(0, 30) for _ in range(size)] for _ in range(size)])
+new_size = 16
 
-# print(original_matrix)
+# Create coordinate array for both original and resized matrices
+x = np.linspace(0, size - 1, size)
+y = x  # Since y coordinates are identical to x
 
-###############################################################################
-# These only needs to be called once!
+# Create coordinate arrays for the resized matrix
+new_x = np.linspace(0, size - 1, new_size)
+new_y = new_x  # Since y coordinates are identical to x
 
-coords = np.linspace(0, 7, size) # Generate x and y coordinates for the original matrix
-
-bicubic_interp = RectBivariateSpline(coords, coords, original_matrix) # create interp func
-
-###############################################################################
-
-
-def interp(new_size: int):
-    # Generate x and y coordinates for the new matrix
-    new_coords = np.linspace(0, 7, new_size)
-
-    # start_time = time.time()
-
-    # Perform bicubic interpolation to get the values for the new matrix
-    new_matrix = bicubic_interp(new_coords, new_coords)
-
-    # elapsed_time = time.time() - start_time
-    # print(f"*** Interpolation for {new_size}-pixel grid\n", 
-    #       f" * Elapsed time: {elapsed_time} seconds\n")
-
-    # print(f"{new_matrix}\n-----------------------------------------")
+# Create meshgrid for the new coordinate arrays
+new_X, new_Y = np.meshgrid(new_x, new_y)
 
 
-print(f"{datetime.datetime.now()}: Begin interpolation test")
+def interp(original_matrix):
+    test_start = time.time()
+
+    # Create RegularGridInterpolator
+    interp_func = RegularGridInterpolator((x, y), original_matrix)
+
+    # Interpolate values for the new coordinates using RegularGridInterpolator
+    resized_matrix = interp_func((new_Y, new_X))
+
+    # Display the resized matrix
+    # print("Resized Matrix:")
+    # print(resized_matrix)
+
+    test_end = time.time()
+
+    return test_end - test_start
+
+
+num_trials = 100000
+print(f"{datetime.datetime.now()}: Begin interpolation test for {num_trials} trials")
 
 test_start = time.time()
 
-for test_num in range(100000):
-    interp(16)
+runtimes = sum(interp(np.random.randint(0, 30, size=(size, size))) for _ in range(num_trials))
 
 test_end = time.time()
 
 print(f"{datetime.datetime.now()}: Testing complete")
-print(f"Total test runtime: {test_end - test_start}")
+print(f"Total test runtime: {test_end - test_start}\n")
+print(f"Average runtime of individual interp() funcs executions: {runtimes/num_trials}\n")
