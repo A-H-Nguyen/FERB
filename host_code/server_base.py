@@ -39,13 +39,12 @@ class FerbProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.peername = transport.get_extra_info("peername")
-        print(f"{datetime.datetime.now()}: Connection from {self.peername}")
+        print(f"{datetime.datetime.now()}: Connection from {self.peername}", "\n")
 
         self.start_wait_timer()  # Start wait timer when connection is made
 
     def start_wait_timer(self):
-        self.wait_timer = asyncio.get_event_loop().call_later(self.TIME_LIMIT, 
-                                                              self.timeout)
+        self.wait_timer = asyncio.get_event_loop().call_later(self.TIME_LIMIT, self.timeout)
 
     def cancel_wait_timer(self):
         if self.wait_timer is not None:
@@ -63,7 +62,7 @@ class FerbProtocol(asyncio.Protocol):
         pass
 
     def connection_lost(self, exc):
-        print(f"{datetime.datetime.now()}: Connection with {self.peername} closed")
+        print(f"{datetime.datetime.now()}: Connection with {self.peername} closed", "\n")
         self.cancel_wait_timer()  # Cancel wait timer when connection is lost
 
     def timeout(self):
@@ -85,7 +84,7 @@ class Server:
 
         # Get the server address and port
         addr = server.sockets[0].getsockname()
-        print(f'Serving on {addr}')
+        print(f"Serving on {addr}", "\n")
 
         async with server:
             await server.serve_forever()

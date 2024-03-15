@@ -4,7 +4,7 @@ from server_base import FerbProtocol, Server
 
 
 class EchoProtocol(FerbProtocol):
-    def start_wait_timer():
+    def start_wait_timer(self):
         pass
 
     def handle_data(self, data):
