@@ -54,9 +54,6 @@ you need to be in the environment to actually use your packages.
 
 
 ## Example Servers:
-### Detector:
-Don't use this one - it is not updated and should be deprecated.
-
 ### Echo Server:
 Implements a simple "echo" function by printing out whatever data it receives onto the terminal.
 This server removes the wait timer implementation.
