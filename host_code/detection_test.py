@@ -36,10 +36,12 @@ class GridEyeProtocol(FerbProtocol):
         Returns:
         - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
         """
-        THRESHOLD_TEMP = 25  # Define a threshold temperature value to consider as part of a blob
+        THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
 
         blobs = []
         visited = set()
+
+        # TODO: try limiting the blob size
 
         # Define a function to perform depth-first search (DFS)
         def dfs(row, col, blob):
