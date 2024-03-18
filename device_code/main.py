@@ -2,6 +2,7 @@ import machine
 import time
 
 from amg88xx import AMG88XX, _PIXEL_TEMP_CONVERSION
+from array import array
 from ClientNethandler import NetHandler
 from debug import FerbCLI
 
@@ -25,27 +26,46 @@ def calibrate_sensor(sensor, calibration_time=5):
 
     print("Calibrating sensor for environmental temperature...")
 
-    total_pixel_values = 64
-    total = 0
+    # total_pixel_values = 64
+    # total = 0
+
+    hot_pixel = 0 # Value of hottest pixel
+    
 
     start_time = time.ticks_ms()
 
     while time.ticks_diff(time.ticks_ms(), start_time) < calibration_time * 1000:
         sensor.refresh()
-        time.sleep_ms(1000)  # Adjust the sleep time if needed
-        pixels = sensor.get_buf()
+        time.sleep_ms(900)  # Adjust the sleep time if needed
+        pixels = array('H', sensor.get_buf())
 
-        print_grid_eye(sensor)
+        # print(pixels)
 
-        for i in range(0, 128, 2):
-            total += pixels[i] | (pixels[i + 1] << 8)
+        local_max = 0
+        for p in pixels:
+            if p > local_max:
+                local_max = p
 
-    average = int((total / (total_pixel_values * calibration_time)) * _PIXEL_TEMP_CONVERSION)
+        # print("Hottest pixel is", local_max)
 
-    print(f"Enviromental temperature is {average} C")
-    print("Calibration Complete\n")
+        if local_max > hot_pixel:
+            hot_pixel = local_max
 
-    return average
+        # print("\n-------------------------")
+
+        # print_grid_eye(sensor)
+
+    #     for i in range(0, 128, 2):
+    #         total += pixels[i] | (pixels[i + 1] << 8)
+
+    # average = int((total / (total_pixel_values * calibration_time)) * _PIXEL_TEMP_CONVERSION)
+
+    # print(f"Enviromental temperature is {average} C")
+    # print("Calibration Complete\n")
+
+    # average = 0
+    # return average
+    return hot_pixel
 
 
 def get_average_temp(data) -> float:
@@ -78,8 +98,9 @@ def FERB_debug():
 def FERB_main():
     if not net.is_wifi_connected():
         print(f"Attempting to connect to {HOST_SSID} ...")
-        if not net.connect_to_wifi(10, HOST_SSID, HOST_PASS):
-            raise Exception(f"Could not connect to wi-fi on {HOST_SSID}")
+        # if not net.connect_to_wifi(10, HOST_SSID, HOST_PASS):
+        #     raise Exception(f"Could not connect to wi-fi on {HOST_SSID}")
+        net.connect_to_wifi(5, HOST_SSID, HOST_PASS)
     print(f"Successfully connected to {net.get_ssid()}\n")
     print(f"Attempting to connect to socket {SERVER_IP}:{SERVER_PORT} ...")
     
@@ -87,19 +108,34 @@ def FERB_main():
     
     print(f"Socket connection successful\n")
 
-    # enviro = calibrate_sensor(sensor)
+    enviro = calibrate_sensor(sensor)
+    net.send_to_socket(bytearray("~" + str(enviro * _PIXEL_TEMP_CONVERSION), "utf-8"))
+    time.sleep_ms(1000)
+
     while True:
         try:
+            # enviro = calibrate_sensor(sensor, 1)
+            # net.send_to_socket(bytearray("~" + str(enviro * _PIXEL_TEMP_CONVERSION), "utf-8"))
+
+            # net.send_to_socket(bytearray("~" + str(21), "utf-8"))
+
+            # time.sleep_ms(1000)
+
             sensor.refresh() # Grid-EYE read data
-            time.sleep_ms(1000)
-            print_grid_eye(sensor)
+            time.sleep_ms(100)
+            # print_grid_eye(sensor)
             net.send_to_socket(sensor.get_buf())
+            # time.sleep_ms(100)
+
+            # # net.send_to_socket(bytearray(b'hey'))
+            # time.sleep_ms(1000)
 
         # Change this later -- we want it so that if something fucks up the FERB will try
         # reconnecting to the wi-fi and then the socket server
         except Exception as e:
             print(f"Error: {e}")
-            time.sleep(2)
+            # time.sleep(2)
+            break
 
         except KeyboardInterrupt as k:
             net.disconnect_socket()
