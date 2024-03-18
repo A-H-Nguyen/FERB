@@ -1,8 +1,11 @@
 import numpy as np
 
 from graphics import *
+from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
+from scipy.interpolate import RegularGridInterpolator
 from time import sleep
 
+_GRID_LEN = 8
 _INTRP_LEN = 16
 
 _MIN=15
@@ -10,7 +13,7 @@ _MAX=30
 
 
 class ThermalCam:
-    def __init__(self, resolution=400, min_temp=15, max_temp=30, 
+    def __init__(self, resolution=800, min_temp=15, max_temp=30, 
                  low_color=(77, 255, 195), high_color=(255, 0, 0)) -> None:
         # Define the size of the thermal image grid
         self._RESOLUTION = resolution
@@ -69,6 +72,7 @@ class ThermalCam:
                 rect = Rectangle(Point(col * self._draw_dist, row * self._draw_dist), 
                                  Point((col + 1) * self._draw_dist, (row + 1) * self._draw_dist))                
                 rect.setFill(color)
+                rect.draw(self.win)
 
                 # temp = temps[row, col]
 
@@ -114,14 +118,29 @@ class ThermalCam:
                 #     rect.draw(self.win)
 
 def value_gen():
-    return np.random.randint(_MIN, _MAX, size=(_INTRP_LEN, _INTRP_LEN))
-
+    return np.random.randint(_MIN, _MAX, size=(_GRID_LEN, _GRID_LEN))
 
 if __name__ == "__main__":
-    cam = ThermalCam(min_temp=0, max_temp=10)
+    orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
+    new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
+    interp_X, interp_Y = np.meshgrid(new_coords, new_coords)
+
+    cam = ThermalCam(min_temp=_MIN, max_temp=_MAX)
 
     while True:
-        cam.draw_thermal_image(value_gen())
-        sleep(0.033)
+        temps = value_gen()
+        print(temps)
+        print("--------------------------------------")
+
+        # Create a scipy interpolation function for our temperature reading
+        interp_func = RegularGridInterpolator((orig_coords, orig_coords), temps)
+
+        # Interpolate values for the new coordinates using the interpolation function
+        # and feed the interpolated matrix into the thermal cam
+        cam.draw_thermal_image(interp_func((interp_Y, interp_X)))
+
+        # cam.draw_thermal_image(temps)
+
+        sleep(0.001)
 
 
