@@ -7,7 +7,8 @@ from scipy.interpolate import RegularGridInterpolator
 
 # Number of pixels for both original Grid-EYE output, and interpolated output
 _GRID_LEN = 8
-_INTRP_LEN = 16
+THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
+
 
 class ThermalCam:
     def __init__(self, resolution=400, min_temp=15, max_temp=30, 
@@ -63,58 +64,89 @@ class ThermalCam:
                 rect.draw(self.win)
 
 
-class ThermalCamProtocol(FerbProtocol):
+class GridEyeProtocol(FerbProtocol):
     def __init__(self):
         self.wait_timer = None
         self.TIME_LIMIT = 10
 
-        # Generate x and y coordinates for the original and interpolated Grid-EYE output
-        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
-        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
-        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
-
         self.cam = ThermalCam()
 
-    def data_received(self, data): # redefine this to overwrite date-time printing
-        self.handle_data(data[:128])
-        
-        self.cancel_wait_timer()  # Cancel current wait timer
-        self.start_wait_timer()  # Restart wait timer upon receiving data
-
     def handle_data(self, data):
-        temps_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
-        
-        # Check the size of our received data. This is neccessary if we run the Pico very fast,
-        # as in having a sleep of < 100 ms every time we send data.
-        # If we run the Pico very fat, then sometimes either the full 128 bytes will not be sent,
-        # or multiple packets can be received at once, making temps_array too large.
-        # Furthermore, for the current unoptimized drawing algorithm, a sleep of < 250 ms doesn't
-        # show a noticable performance increase.
-        if temps_array.size != 64:
+        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+        if data_array.size != 64:
             print("skipped")
             return
+
+        # Normalization
+        for i in range(data_array.size):
+            if data_array[i] < THRESHOLD_TEMP:
+                data_array[i] = 0
+
+        # Reshape the array to form an 8x8 matrix
+        matrix = data_array.reshape((_GRID_LEN, _GRID_LEN))
+
+        print("Temperature Matrix:")
+        print(matrix)
+        print("\nDetected Blobs:")
+        detected_blobs = self.blob_detection(matrix)
+        for i, blob in enumerate(detected_blobs, start=1):
+            print(f"Blob {i}: {blob}")
+        print("\n-----------------------------------------\n")
         
-        temps_matrix = temps_array.reshape((_GRID_LEN, _GRID_LEN))
+        self.cam.draw_thermal_image(matrix)
 
-        # # Create a scipy interpolation function for our temperature reading
-        # interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), temps_matrix)
+    def blob_detection(self, matrix):
+        """
+        Perform blob detection on the temperature matrix.
 
-        # # Interpolate values for the new coordinates using the interpolation function
-        # # and feed the interpolated matrix into the thermal cam
-        # self.cam.draw_thermal_image(interp_func((self.interp_Y, self.interp_X)))
-        self.cam.draw_thermal_image(temps_matrix)
+        Args:
+        - matrix (numpy.ndarray): An 8x8 matrix of temperature values.
 
+        Returns:
+        - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
+        """
 
-    def connection_lost(self, exc):
-        print(f"Connection with {self.peername} closed")
-        self.cam.win.close()
-        self.cancel_wait_timer()  # Cancel wait timer when connection is lost
+        blobs = []
+        visited = set()
+
+        # Define a function to perform depth-first search (DFS)
+        def dfs(row, col, blob):
+            if (row, col) in visited or row < 0 or col < 0 or row >= matrix.shape[0] or col >= matrix.shape[1]:
+                return
+            if matrix[row][col] < THRESHOLD_TEMP:
+                return
+            visited.add((row, col))
+            blob.append((row, col))
+            # Explore neighboring cells
+            dfs(row + 1, col, blob)
+            dfs(row - 1, col, blob)
+            dfs(row, col + 1, blob)
+            dfs(row, col - 1, blob)
+            # Diagonal exploration 
+            dfs(row - 1, col - 1, blob)
+            dfs(row - 1, col + 1, blob)
+            dfs(row + 1, col - 1, blob)
+            dfs(row + 1, col + 1, blob)
+
+        # Iterate through each cell in the matrix
+        for i in range(matrix.shape[0]):
+            for j in range(matrix.shape[1]):
+                if matrix[i][j] >= THRESHOLD_TEMP and (i, j) not in visited:
+                    # Start a new blob
+                    blob = []
+                    dfs(i, j, blob)
+                    blobs.append(blob)
+
+        return blobs
 
 
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.start_server(ThermalCamProtocol))
+        asyncio.run(server.start_server(GridEyeProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
+
