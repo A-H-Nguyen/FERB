@@ -3,7 +3,6 @@ import numpy as np
 
 from graphics import *
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
-from scipy.interpolate import RegularGridInterpolator
 
 # Number of pixels for both original Grid-EYE output, and interpolated output
 _GRID_LEN = 8
@@ -14,9 +13,6 @@ class ThermalCam:
                  low_color=(77, 255, 195), high_color=(255, 0, 0)) -> None:
         # Define the size of the thermal image grid
         self._RESOLUTION = resolution
-
-        # Set the window with the given resolution
-        self.win = GraphWin("Thermal Image", self._RESOLUTION, self._RESOLUTION)
 
         # Initialize temperature parameters
         self._MIN_TEMP = min_temp  # Minimum temperature value
@@ -34,7 +30,9 @@ class ThermalCam:
 
         # Precompute the length of grid-eye pixels for drawing
         self._draw_distance = self._RESOLUTION / _GRID_LEN
-        # self._draw_distance = self._RESOLUTION / _INTRP_LEN
+
+        # Set the window with the given resolution
+        self.win = GraphWin("Thermal Image", self._RESOLUTION, self._RESOLUTION)
 
     def map_temperature(self, val):
         # Normalize val between 0 and 1
@@ -51,11 +49,8 @@ class ThermalCam:
                          np.clip(b, 0, 255))
 
     def draw_thermal_image(self, temps):
-        # Draw squares to represent each pixel of the thermal image
         for row in range(_GRID_LEN):
-        # for row in range(_INTRP_LEN):
             for col in range(_GRID_LEN):
-            # for col in range(_INTRP_LEN):
                 color = self.map_temperature(temps[row, col])
                 rect = Rectangle(Point(col * self._draw_distance, row * self._draw_distance), 
                                  Point((col + 1) * self._draw_distance, (row + 1) * self._draw_distance))
@@ -67,11 +62,6 @@ class ThermalCamProtocol(FerbProtocol):
     def __init__(self):
         self.wait_timer = None
         self.TIME_LIMIT = 10
-
-        # Generate x and y coordinates for the original and interpolated Grid-EYE output
-        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
-        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
-        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
 
         self.cam = ThermalCam()
 
@@ -96,14 +86,7 @@ class ThermalCamProtocol(FerbProtocol):
         
         temps_matrix = temps_array.reshape((_GRID_LEN, _GRID_LEN))
 
-        # # Create a scipy interpolation function for our temperature reading
-        # interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), temps_matrix)
-
-        # # Interpolate values for the new coordinates using the interpolation function
-        # # and feed the interpolated matrix into the thermal cam
-        # self.cam.draw_thermal_image(interp_func((self.interp_Y, self.interp_X)))
         self.cam.draw_thermal_image(temps_matrix)
-
 
     def connection_lost(self, exc):
         print(f"Connection with {self.peername} closed")
