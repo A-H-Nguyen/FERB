@@ -42,8 +42,7 @@ class ThermalCam:
                 rect = self.rectangles[row][col]
                 rect.undraw()
 
-                if temps[row, col]: # >= THRESHOLD_TEMP:
-                    # rect.setFill(self._black)
+                if temps[row, col] >= THRESHOLD_TEMP:
                     rect.draw(self.win)
 
 
@@ -73,11 +72,7 @@ class GridEyeProtocol(FerbProtocol):
         # Create a scipy interpolation function for our temperature reading
         interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), matrix)
         interp_matrix = interp_func((self.interp_Y, self.interp_X))
-        norm_matrix = interp_matrix > THRESHOLD_TEMP
-        # for i in range(_INTRP_LEN ):
-        #     for j in range(_INTRP_LEN ):
-        #         if interp_matrix[i][j] < THRESHOLD_TEMP:
-        #             interp_matrix[i][j] = 0
+        norm_matrix = np.where(interp_matrix > THRESHOLD_TEMP, interp_matrix, 0)
 
         # print("Temperature Matrix:")
         # print(interp_matrix)
