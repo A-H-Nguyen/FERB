@@ -1,10 +1,13 @@
 import asyncio
 import numpy as np
-
+import plotly.graph_objects as go
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 
-
 class GridEyeProtocol(FerbProtocol):
+    def __init__(self):
+        super().__init__()
+        self.data_history = []
+
     def handle_data(self, data):
         msg = data.decode()
 
@@ -18,13 +21,39 @@ class GridEyeProtocol(FerbProtocol):
         # Reshape the array to form an 8x8 matrix
         matrix = data_array.reshape((8, 8))
 
-        print("Temperature Matrix:")
-        print(matrix)
-        print("\nDetected Blobs:")
         detected_blobs = self.blob_detection(matrix)
-        for i, blob in enumerate(detected_blobs, start=1):
-            print(f"Blob {i}: {blob}")
-        print("\n-----------------------------------------\n")
+        total_count = sum(blob['person_count'] for blob in detected_blobs)
+        print("Total count:", total_count)
+
+        # Append data to history
+        self.data_history.append({
+            'matrix': matrix,
+            'blobs': detected_blobs
+        })
+
+        # Update heatmap
+        self.update_heatmap()
+
+    def update_heatmap(self):
+        # Extract data from history for heatmap
+        matrix = self.data_history[-1]['matrix']
+
+        # Create heatmap figure
+        fig = go.Figure(data=go.Heatmap(
+            z=matrix,
+            colorscale='Viridis',
+            zmin=np.min(matrix),
+            zmax=np.max(matrix)
+        ))
+
+        fig.update_layout(
+            title='Live Heatmap of Temperature',
+            xaxis_title='Column',
+            yaxis_title='Row'
+        )
+
+        # Show the figure
+        fig.show()
 
     def blob_detection(self, matrix):
         """
@@ -34,14 +63,12 @@ class GridEyeProtocol(FerbProtocol):
         - matrix (numpy.ndarray): An 8x8 matrix of temperature values.
 
         Returns:
-        - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
+        - List of dictionaries: Each dictionary represents the blob with its coordinates and person count.
         """
         THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
 
         blobs = []
         visited = set()
-
-        # TODO: try limiting the blob size
 
         # Define a function to perform depth-first search (DFS)
         def dfs(row, col, blob):
@@ -93,11 +120,7 @@ class GridEyeProtocol(FerbProtocol):
             # Replace the blob with its pixel count and adjusted person count
             blobs[blobs.index(blob)] = blob_data
         
-        total_count = sum(blob['person_count'] for blob in blobs)
-        print("Total count:", total_count)
-
         return blobs
-
 
 if __name__ == "__main__":
     try:

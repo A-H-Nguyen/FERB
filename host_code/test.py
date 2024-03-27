@@ -1,53 +1,215 @@
-# # DELETE ME LATER!
-import datetime
+import asyncio
 import numpy as np
-import time
 
+# from graphics import *
+from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 from scipy.interpolate import RegularGridInterpolator
 
-# Define original matrix size and new size
-size = 8
-new_size = 16
-
-# Create coordinate array for both original and resized matrices
-x = np.linspace(0, size - 1, size)
-y = x  # Since y coordinates are identical to x
-
-# Create coordinate arrays for the resized matrix
-new_x = np.linspace(0, size - 1, new_size)
-new_y = new_x  # Since y coordinates are identical to x
-
-# Create meshgrid for the new coordinate arrays
-new_X, new_Y = np.meshgrid(new_x, new_y)
+# from kivy.app import App
+# # from kivy.clock import Clock
+# from kivy.config import Config
+# # from kivy.graphics import Mesh, Color
+# # from kivy.graphics.texture import Texture
+# # from kivy.uix.boxlayout import BoxLayout
+# from kivy.uix.widget import Widget
 
 
-def interp(original_matrix):
-    test_start = time.time()
-
-    # Create RegularGridInterpolator
-    interp_func = RegularGridInterpolator((x, y), original_matrix)
-
-    # Interpolate values for the new coordinates using RegularGridInterpolator
-    resized_matrix = interp_func((new_Y, new_X))
-
-    # Display the resized matrix
-    # print("Resized Matrix:")
-    # print(resized_matrix)
-
-    test_end = time.time()
-
-    return test_end - test_start
+# # SCREEN_LEN = 800
+# # RESOLUTION = 8
+# # PIXEL_LEN = int(SCREEN_LEN / RESOLUTION)
 
 
-num_trials = 100000
-print(f"{datetime.datetime.now()}: Begin interpolation test for {num_trials} trials")
+# # # Set the window size
+# # Config.set('graphics', 'width', str(SCREEN_LEN))
+# # Config.set('graphics', 'height', str(SCREEN_LEN))
 
-test_start = time.time()
 
-runtimes = sum(interp(np.random.randint(0, 30, size=(size, size))) for _ in range(num_trials))
+# # class ThermalCameraWidget(Widget):
+# #     def __init__(self, **kwargs):
+# #         super().__init__(**kwargs)
 
-test_end = time.time()
+# #         self.colors = np.zeros((RESOLUTION, RESOLUTION, 3), dtype=np.uint8)
 
-print(f"{datetime.datetime.now()}: Testing complete")
-print(f"Total test runtime: {test_end - test_start}\n")
-print(f"Average runtime of individual interp() funcs executions: {runtimes/num_trials}\n")
+# #         self.texture = Texture.create(size=(RESOLUTION,RESOLUTION), colorfmt="rgb")
+# #         self.texture.blit_buffer(self.colors.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+
+# #         self.mesh = self.build_mesh()
+# #         self.mesh.texture = self.texture
+# #         self.canvas.add(self.mesh)
+
+# #     def build_mesh(self):
+# #         vertices = []
+# #         indices = []
+# #         # for row in range(RESOLUTION):
+# #         #     for col in range(RESOLUTION):
+# #         #         x = col * PIXEL_LEN
+# #         #         y = row * PIXEL_LEN
+# #         #         vertices.extend([x, y, 0, 
+# #         #                          x + PIXEL_LEN, y, 0, 
+# #         #                          x, y + PIXEL_LEN, 0, 
+# #         #                          x + PIXEL_LEN, y + PIXEL_LEN, 0])
+# #         #         indices.extend([4 * (row * RESOLUTION + col), 
+# #         #                         4 * (row * RESOLUTION + col) + 1, 
+# #         #                         4 * (row * RESOLUTION + col) + 2, 
+# #         #                         4 * (row * RESOLUTION + col) + 3])
+
+# #         # for row in range(RESOLUTION + 1):
+# #         #     for col in range(RESOLUTION + 1):
+# #         #         x = col * PIXEL_LEN
+# #         #         y = row * PIXEL_LEN
+# #         #         vertices.extend([x, y, 0])
+    
+# #         # for row in range(RESOLUTION):
+# #         #     for col in range(RESOLUTION):
+# #         #         indices.extend([row * (RESOLUTION + 1) + col,
+# #         #                        (row + 1) * (RESOLUTION + 1) + col,
+# #         #                        (row + 1) * (RESOLUTION + 1) + col + 1,
+# #         #                         row * (RESOLUTION + 1) + col + 1])
+
+
+
+# #         return Mesh(vertices=vertices, indices=indices, mode='lines')
+
+# #     def on_touch_down(self, touch):
+# #         self.colors[:, :] = np.random.randint(0, 255, size=(RESOLUTION, RESOLUTION, 3), dtype=np.uint8)
+# #         self.texture.blit_buffer(self.colors.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+# #         self.mesh.texture = self.texture
+
+
+# # class ThermalCameraApp(App):
+# #     def build(self):
+# #         return ThermalCameraWidget()
+# #         # wid = Widget()
+# #         # with wid.canvas:
+# #         #     self.mesh = self.build_mesh()
+        
+# #         # layout = BoxLayout(size_hint=(1, None), height=50)
+
+# #         # root = BoxLayout(orientation='vertical')
+# #         # root.add_widget(wid)
+# #         # root.add_widget(layout)
+
+
+# # if __name__ == '__main__':
+# #     ThermalCameraApp().run()
+
+# # #     #     with self.canvas:
+# # #     #         # Rectangle(texture=self.create_texture((77, 255, 195)),
+# # #     #         #           pos=touch.pos, size=(PIXEL_LEN, PIXEL_LEN))
+# # #     #         for i in self.rect_dict.keys():
+# # #     #             for rect in self.rect_dict[i]:
+# # #     #                 rect.texture = self.create_texture(tuple(np.random.randint(0, 255, size=3)))
+
+
+# # #     # Create a solid color texture (RGB format)
+# # #     # def create_texture(self, color: tuple[int, int, int] = (0,0,0)):
+# # #     # def create_texture(self):
+# # #     #     # color_array = np.full((PIXEL_LEN, PIXEL_LEN, 3), color, dtype=np.uint8)
+
+# # #     #     texture = Texture.create(size=(PIXEL_LEN,PIXEL_LEN), colorfmt="rgb")
+# # #     #     # texture.blit_buffer(color_array.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+# # #     #     texture.blit_buffer(self.colors.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+
+# # #     #     return texture
+# # from kivy.app import App
+# # from kivy.uix.gridlayout import GridLayout
+# # from kivy.uix.boxlayout import BoxLayout
+# # from kivy.uix.widget import Widget
+# # from kivy.graphics import Color, Rectangle
+# # from random import random
+
+# class ColorGridWidget(Widget):
+#     def __init__(self, resolution, **kwargs):
+#         super().__init__(**kwargs)
+#         self.resolution = resolution
+# #         self.texture = Texture.create(size=(RESOLUTION,RESOLUTION), colorfmt="rgb")
+# #         self.texture.blit_buffer(self.colors.tobytes(), colorfmt='rgb', bufferfmt='ubyte')
+# #         self.build_grid()
+
+# #     def build_grid(self):
+# #         grid_layout = GridLayout(cols=self.resolution, spacing=5)
+# #         cell_size = (self.width / self.resolution, self.height / self.resolution)
+# #         for _ in range(self.resolution):
+# #             for _ in range(self.resolution):
+# #                 color = (random(), random(), random(), 1)  # Random RGBA color
+# #                 cell = Widget(size=cell_size)
+# #                 with cell.canvas:
+# #                     Color(*color)
+# #                     Rectangle(pos=cell.pos, size=cell.size)
+# #                 grid_layout.add_widget(cell)
+# #         self.add_widget(grid_layout)
+
+# #     def on_size(self, instance, value):
+# #         self.clear_widgets()
+# #         self.build_grid()
+
+# class ColorGridApp(App):
+#     def build(self):
+#         return ColorGridWidget(resoultion=4)
+
+# if __name__ == '__main__':
+
+#     ColorGridApp().run()
+
+# Number of pixels for both original Grid-EYE output, and interpolated output
+_GRID_LEN = 8
+_INTRP_LEN = 16
+
+class GridEyeProtocol(FerbProtocol):
+    def __init__(self):
+        super().__init__()
+        
+        # Generate x and y coordinates for the original and interpolated Grid-EYE output
+        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
+        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
+        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
+
+        self.cal = True
+        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+
+    def handle_data(self, data):
+        msg = data.decode()
+        if msg[0] == '~':
+            # start calibration sequence here
+            print("\nCalibrating sensor. Get the fuck out of the way\n")
+            self.cal = False
+            return
+
+        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+        if data_array.size != 64:
+            print("skipped")
+            return
+
+        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+        # Reshape the array to form an 8x8 matrix
+        matrix = data_array.reshape((8, 8))
+
+        # Create a scipy interpolation function for our temperature reading
+        interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), matrix)
+        interp_matrix = interp_func((self.interp_Y, self.interp_X))
+        
+        if not self.cal:
+            self.background = interp_matrix
+            self.cal = True
+            print("\nCalibrating done.")
+        else:
+            diff_matrix = np.round(interp_matrix - self.background) 
+            print(diff_matrix)
+            # for row in range(_INTRP_LEN):
+            #     for col in range(_INTRP_LEN):
+            #         print(diff_matrix[row,col], end='  ')
+            #     print('\n')
+            print("\n-----------------------------------------\n")
+
+
+if __name__ == "__main__":
+    try:
+        server = Server()
+        asyncio.run(server.start_server(GridEyeProtocol))
+        
+    except KeyboardInterrupt as k:
+        print("\nGoodbye cruel world\n")

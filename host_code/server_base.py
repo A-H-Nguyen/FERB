@@ -8,6 +8,7 @@ _DEFAULT_PORT = 11111
 
 PIXEL_TEMP_CONVERSION = 0.25
 
+
 class CLI:
     def __init__(self) -> None:
         self.parser = argparse.ArgumentParser(description='Info for socket server')

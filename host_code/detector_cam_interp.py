@@ -1,7 +1,6 @@
 import asyncio
 import numpy as np
 
-from graphics import *
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 from scipy.interpolate import RegularGridInterpolator
 
@@ -12,58 +11,17 @@ _INTRP_LEN = 16
 THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
 
 
-class ThermalCam:
-    def __init__(self, resolution=400, min_temp=15, max_temp=30, 
-                 low_color=(77, 255, 195), high_color=(255, 0, 0)) -> None:
-        # Define the size of the thermal image grid
-        self._RESOLUTION = resolution
+class Blob:
+    def __init__(self, label: int) -> None:
+        self.pixels = []
+        self.label = label
 
-        # Set the window with the given resolution
-        self.win = GraphWin("Thermal Image", self._RESOLUTION, self._RESOLUTION)
+        # Minimum and maximum blob sizes, assuming that the blob is a square
+        self.min = 4  # minimum blob size is a 2x2
+        self.max = 16 # maximum blob size is a 4x4
 
-        # Initialize temperature parameters
-        self._MIN_TEMP = min_temp  # Minimum temperature value
-        self._MAX_TEMP = max_temp  # Maximum temperature value
-        self._temp_diff = self._MAX_TEMP - self._MIN_TEMP
-
-        # Set color values
-        self._LOW_COLOR = low_color
-        self._HIGH_COLOR = high_color
-
-        # Compute color interpolation differences
-        self._red = self._HIGH_COLOR[0] - self._LOW_COLOR[0]
-        self._green = self._HIGH_COLOR[1] - self._LOW_COLOR[1]
-        self._blue = self._HIGH_COLOR[2] - self._LOW_COLOR[2]
-
-        # Precompute the length of grid-eye pixels for drawing
-        # self._draw_distance = self._RESOLUTION / _GRID_LEN
-        self._draw_distance = self._RESOLUTION / _INTRP_LEN
-
-    def map_temperature(self, val):
-        # Normalize val between 0 and 1
-        normalized_val = (val - self._MIN_TEMP) / self._temp_diff
-
-        # Interpolate RGB values
-        r = int(self._LOW_COLOR[0] + normalized_val * self._red)
-        g = int(self._LOW_COLOR[1] + normalized_val * self._green)
-        b = int(self._LOW_COLOR[2] + normalized_val * self._blue)
-
-        # Ensure that the color values are between 0 and 255
-        return color_rgb(np.clip(r, 0, 255),
-                         np.clip(g, 0, 255),
-                         np.clip(b, 0, 255))
-
-    def draw_thermal_image(self, temps):
-        # Draw squares to represent each pixel of the thermal image
-        # for row in range(_GRID_LEN):
-        for row in range(_INTRP_LEN):
-            # for col in range(_GRID_LEN):
-            for col in range(_INTRP_LEN):
-                color = self.map_temperature(temps[row, col])
-                rect = Rectangle(Point(col * self._draw_distance, row * self._draw_distance), 
-                                 Point((col + 1) * self._draw_distance, (row + 1) * self._draw_distance))
-                rect.setFill(color)
-                rect.draw(self.win)
+    def add_pixel(self, new_pixel) -> None:
+        self.pixels.append(new_pixel)
 
 
 class GridEyeProtocol(FerbProtocol):
@@ -76,7 +34,8 @@ class GridEyeProtocol(FerbProtocol):
         self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
         self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
 
-        self.cam = ThermalCam()
+        self.visited_matrix = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+        self.blobs = []
 
     def handle_data(self, data):
         # Convert the bytearray to a numpy array of 16-bit integers (short ints)
@@ -86,25 +45,16 @@ class GridEyeProtocol(FerbProtocol):
             print("skipped")
             return
 
-        # Normalization
-        # for i in range(data_array.size):
-        #     if data_array[i] < THRESHOLD_TEMP:
-        #         data_array[i] = 0
-
         # Reshape the array to form an 8x8 matrix
         matrix = data_array.reshape((_GRID_LEN, _GRID_LEN))
 
         # Create a scipy interpolation function for our temperature reading
         interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), matrix)
         interp_matrix = interp_func((self.interp_Y, self.interp_X))
-
-        for i in range(_INTRP_LEN ):
-            for j in range(_INTRP_LEN ):
-                if interp_matrix[i][j] < THRESHOLD_TEMP:
-                    interp_matrix[i][j] = 0
+        norm_matrix = np.where(interp_matrix > THRESHOLD_TEMP, interp_matrix, 0)
 
         print("Temperature Matrix:")
-        print(interp_matrix)
+        print(norm_matrix)
         print("\nDetected Blobs:")
         # detected_blobs = self.blob_detection(matrix)
         detected_blobs = self.blob_detection(interp_matrix)
@@ -112,53 +62,96 @@ class GridEyeProtocol(FerbProtocol):
             print(f"Blob {i}: {blob}")
         print("\n-----------------------------------------\n")
         
-        # self.cam.draw_thermal_image(matrix)
-        self.cam.draw_thermal_image(interp_matrix)
-
-    def blob_detection(self, matrix):
+    def blob_detection(self, temps):
         """
         Perform blob detection on the temperature matrix.
 
         Args:
-        - matrix (numpy.ndarray): An 8x8 matrix of temperature values.
+        - temps (numpy.ndarray): An 8x8 matrix of temperature values.
 
         Returns:
         - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
         """
 
-        blobs = []
-        visited = set()
+        self.visited_matrix &= 0
 
-        # Define a function to perform depth-first search (DFS)
-        def dfs(row, col, blob):
-            if (row, col) in visited or row < 0 or col < 0 or row >= matrix.shape[0] or col >= matrix.shape[1]:
-                return
-            if matrix[row][col] < THRESHOLD_TEMP:
-                return
-            visited.add((row, col))
-            blob.append((row, col))
-            # Explore neighboring cells
-            dfs(row + 1, col, blob)
-            dfs(row - 1, col, blob)
-            dfs(row, col + 1, blob)
-            dfs(row, col - 1, blob)
-            # Diagonal exploration 
-            dfs(row - 1, col - 1, blob)
-            dfs(row - 1, col + 1, blob)
-            dfs(row + 1, col - 1, blob)
-            dfs(row + 1, col + 1, blob)
+        # blobs = []
+        # visited = set()
 
         # Iterate through each cell in the matrix
-        for i in range(matrix.shape[0]):
-            for j in range(matrix.shape[1]):
-                if matrix[i][j] >= THRESHOLD_TEMP and (i, j) not in visited:
+        for i in range(_INTRP_LEN):
+            for j in range(_INTRP_LEN):
+                # if temps[i][j] >= THRESHOLD_TEMP and (i, j) not in visited:
+                if temps[i,j] >= THRESHOLD_TEMP and not self.visited_matrix[i,j]:
+
+                    # Check if this pixel is not already wrapped in a blob
+                    for b in self.blobs:
+                        pass
+
                     # Start a new blob
-                    blob = []
-                    dfs(i, j, blob)
-                    blobs.append(blob)
+                    new_blob = Blob(len(self.blobs))
 
-        return blobs
+                    self.blobs.append(new_blob)
+                    # blob = []
+                    # dfs(i, j, blob)
+                    # blobs.append(blob)
 
+        # # Define a function to perform depth-first search (DFS)
+        # def dfs(row, col, blob):
+        #     if (row, col) in visited or row < 0 or col < 0 or row >= temps.shape[0] or col >= matrix.shape[1]:
+        #         return
+        #     if matrix[row][col] < THRESHOLD_TEMP:
+        #         return
+        #     visited.add((row, col))
+        #     blob.append((row, col))
+        #     # Explore neighboring cells
+        #     dfs(row + 1, col, blob)
+        #     dfs(row - 1, col, blob)
+        #     dfs(row, col + 1, blob)
+        #     dfs(row, col - 1, blob)
+        #     # Diagonal exploration 
+        #     dfs(row - 1, col - 1, blob)
+        #     dfs(row - 1, col + 1, blob)
+        #     dfs(row + 1, col - 1, blob)
+        #     dfs(row + 1, col + 1, blob)
+
+        # # Iterate through each cell in the matrix
+        # for i in range(matrix.shape[0]):
+        #     for j in range(matrix.shape[1]):
+        #         if matrix[i][j] >= THRESHOLD_TEMP and (i, j) not in visited:
+        #             # Start a new blob
+        #             blob = []
+        #             dfs(i, j, blob)
+        #             blobs.append(blob)
+
+        # return blobs
+
+    def dfs(self, row, col, temps, blob: Blob):
+        # Check bounds
+        if row < 0 or col < 0 or row >= _INTRP_LEN or col >= _INTRP_LEN:
+            return
+
+        # Check if this location has already been visited
+        if self.visited_matrix[row,col]: 
+            return
+
+        self.visited_matrix[row,col] = 1
+
+        # Check pixel value
+        if temps[row, col] < THRESHOLD_TEMP:
+            return 
+
+        blob.add_pixel((row,col))
+
+        # Visit surrounding pixels
+        self.dfs(row, col - 1, blob)
+        self.dfs(row, col + 1, blob)
+        self.dfs(row - 1, col, blob)
+        self.dfs(row - 1, col - 1, blob)
+        self.dfs(row - 1, col + 1, blob)
+        self.dfs(row + 1, col, blob)
+        self.dfs(row + 1, col - 1, blob)
+        self.dfs(row + 1, col + 1, blob)
 
 if __name__ == "__main__":
     try:
