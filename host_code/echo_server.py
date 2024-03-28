@@ -4,6 +4,9 @@ from server_base import FerbProtocol, Server
 
 
 class EchoProtocol(FerbProtocol):
+    def start_wait_timer(self):
+        pass
+
     def handle_data(self, data):
         print(data.decode())
 
@@ -11,7 +14,7 @@ class EchoProtocol(FerbProtocol):
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.ferb_main(EchoProtocol))
+        asyncio.run(server.start_server(EchoProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")

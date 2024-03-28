@@ -1,9 +1,12 @@
 import argparse
 import asyncio
+import datetime
 
 
 _DEFAULT_IP = '10.42.0.1'
 _DEFAULT_PORT = 11111
+
+PIXEL_TEMP_CONVERSION = 0.25
 
 
 class CLI:
@@ -32,26 +35,26 @@ class CLI:
 class FerbProtocol(asyncio.Protocol):
     def __init__(self):
         self.wait_timer = None
-        self.TIME_LIMIT = 5
+        self.TIME_LIMIT = 10
 
     def connection_made(self, transport):
         self.transport = transport
         self.peername = transport.get_extra_info("peername")
-        print(f"Connection from {self.peername}")
+        print(f"{datetime.datetime.now()}: Connection from {self.peername}", "\n")
+
         self.start_wait_timer()  # Start wait timer when connection is made
 
     def start_wait_timer(self):
-        self.wait_timer = asyncio.get_event_loop().call_later(self.TIME_LIMIT, 
-                                                              self.timeout)
+        self.wait_timer = asyncio.get_event_loop().call_later(self.TIME_LIMIT, self.timeout)
 
     def cancel_wait_timer(self):
         if self.wait_timer is not None:
             self.wait_timer.cancel()
 
     def data_received(self, data):
-        print(f"Data received from {self.peername}")
+        print(f"{datetime.datetime.now()}: Data received from {self.peername}")
         
-        self.handle_data(data)
+        self.handle_data(data[:128])
         
         self.cancel_wait_timer()  # Cancel current wait timer
         self.start_wait_timer()  # Restart wait timer upon receiving data
@@ -60,11 +63,11 @@ class FerbProtocol(asyncio.Protocol):
         pass
 
     def connection_lost(self, exc):
-        print(f"Connection with {self.peername} closed")
+        print(f"{datetime.datetime.now()}: Connection with {self.peername} closed", "\n")
         self.cancel_wait_timer()  # Cancel wait timer when connection is lost
 
     def timeout(self):
-        print("Timeout: No data received within the specified time")
+        print(f"{datetime.datetime.now()}: Connection timeout - No data received")
         self.transport.close()  # Close connection on timeout
 
 
@@ -72,7 +75,7 @@ class Server:
     def __init__(self) -> None:
         self.cli = CLI()
     
-    async def ferb_main(self, protocol_class):
+    async def start_server(self, protocol_class):
         # Get the current event loop
         loop = asyncio.get_running_loop()
 
@@ -82,7 +85,7 @@ class Server:
 
         # Get the server address and port
         addr = server.sockets[0].getsockname()
-        print(f'Serving on {addr}')
+        print(f"Serving on {addr}", "\n")
 
         async with server:
             await server.serve_forever()
@@ -91,7 +94,7 @@ class Server:
 if __name__ == "__main__":
     try:
         server = Server()
-        asyncio.run(server.ferb_main(FerbProtocol))
+        asyncio.run(server.start_server(FerbProtocol))
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
