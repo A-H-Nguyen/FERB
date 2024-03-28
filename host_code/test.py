@@ -154,6 +154,8 @@ from scipy.interpolate import RegularGridInterpolator
 # Number of pixels for both original Grid-EYE output, and interpolated output
 _GRID_LEN = 8
 _INTRP_LEN = 16
+_GRAYSCALE = 255
+
 
 class GridEyeProtocol(FerbProtocol):
     def __init__(self):
@@ -164,15 +166,53 @@ class GridEyeProtocol(FerbProtocol):
         self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
         self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
 
-        self.cal = True
+        # Used for background subtraction
         self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+        
+        # Variables for calibration sequence
+        self.cal_finished = True
+        self.cal_counter = 1
+
+        # Default values for range of temps post-background subtraction
+        self.min_val = 0
+        self.max_val = 5
+
+    def calibrate(self, input_matrix) -> None:
+        self.background += input_matrix
+        self.cal_counter += 1
+
+        if self.cal_counter > 5:
+            self.background /= self.cal_counter
+            self.cal_finished = True
+            print("\nCalibrating done.")
+            print("\n-----------------------------------------\n")
+
+    def convert_to_grayscale(self, value) -> int:
+        return int(((value - self.min_val) / (self.max_val - self.min_val)) * _GRAYSCALE)
+
+    def normalize_data(self, data):
+        for row in range(_INTRP_LEN):
+            for col in range(_INTRP_LEN):
+                if data[row,col] < self.min_val:
+                    self.min_val = data[row,col]
+                if data[row,col] > self.max_val:
+                    self.max_val = data[row,col]
+
+        print("Min val:", self.min_val,
+              "Max val:", self.max_val)
+
+        for row in range(_INTRP_LEN):
+            for col in range(_INTRP_LEN):
+                data[row,col] = self.convert_to_grayscale(data[row,col])
+
+        print(data)
 
     def handle_data(self, data):
         msg = data.decode()
         if msg[0] == '~':
             # start calibration sequence here
-            print("\nCalibrating sensor. Get the fuck out of the way\n")
-            self.cal = False
+            print("\nCalibrating sensor. Get out of the way\n")
+            self.cal_finished = False
             return
 
         # Convert the bytearray to a numpy array of 16-bit integers (short ints)
@@ -192,18 +232,18 @@ class GridEyeProtocol(FerbProtocol):
         interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), matrix)
         interp_matrix = interp_func((self.interp_Y, self.interp_X))
         
-        if not self.cal:
-            self.background = interp_matrix
-            self.cal = True
-            print("\nCalibrating done.")
-        else:
-            diff_matrix = np.round(interp_matrix - self.background) 
-            print(diff_matrix)
-            # for row in range(_INTRP_LEN):
-            #     for col in range(_INTRP_LEN):
-            #         print(diff_matrix[row,col], end='  ')
-            #     print('\n')
-            print("\n-----------------------------------------\n")
+        if not self.cal_finished:
+            self.calibrate(interp_matrix)
+            return
+        
+        # diff_matrix = np.round(interp_matrix - self.background) 
+        # print(diff_matrix)
+        # self.normalize_data(diff_matrix)
+        # for row in range(_INTRP_LEN):
+        #     for col in range(_INTRP_LEN):
+        #         print(diff_matrix[row,col], end='  ')
+        #     print('\n')
+        print("\n-----------------------------------------\n")
 
 
 if __name__ == "__main__":

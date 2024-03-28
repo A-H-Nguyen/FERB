@@ -1,11 +1,26 @@
 import asyncio
 import numpy as np
-import plotly.graph_objects as go
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
+import pygame
+
+# Constants for Pygame visualization
+WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 400
+PIXEL_SIZE = 50
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLACK = (0, 0, 0)
 
 class GridEyeProtocol(FerbProtocol):
     def __init__(self):
         super().__init__()
+        # Initialize Pygame
+        pygame.init()
+        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption('Heatmap Visualization')
+        self.clock = pygame.time.Clock()
+
+        # Initialize data_history to store historical data
         self.data_history = []
 
     def handle_data(self, data):
@@ -25,35 +40,37 @@ class GridEyeProtocol(FerbProtocol):
         total_count = sum(blob['person_count'] for blob in detected_blobs)
         print("Total count:", total_count)
 
+        # Update heatmap visualization
+        self.update_heatmap(matrix)
+
         # Append data to history
         self.data_history.append({
             'matrix': matrix,
             'blobs': detected_blobs
         })
 
-        # Update heatmap
-        self.update_heatmap()
+    def update_heatmap(self, matrix):
+        # Clear the window
+        self.window.fill(WHITE)
 
-    def update_heatmap(self):
-        # Extract data from history for heatmap
-        matrix = self.data_history[-1]['matrix']
+        # Draw the heatmap
+        for x in range(8):
+            for y in range(8):
+                # Scale the temperature to heatmap intensity
+                intensity = int(((30 - matrix[x, y]) / 30) * 255)  # Temperature range: 0 to 30 degrees Celsius
+                # Ensure intensity is within valid range [0, 255]
+                intensity = max(0, min(intensity, 255))
+                # Invert intensity for black (hot temperatures) and white (cold temperatures)
+                color = (intensity, intensity, intensity)
+                # Draw a rectangle for each pixel in the heatmap data
+                pygame.draw.rect(self.window, color, (x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE))
 
-        # Create heatmap figure
-        fig = go.Figure(data=go.Heatmap(
-            z=matrix,
-            colorscale='Viridis',
-            zmin=np.min(matrix),
-            zmax=np.max(matrix)
-        ))
+        # Update the display
+        pygame.display.flip()
 
-        fig.update_layout(
-            title='Live Heatmap of Temperature',
-            xaxis_title='Column',
-            yaxis_title='Row'
-        )
+        # Cap the frame rate
+        self.clock.tick(30)
 
-        # Show the figure
-        fig.show()
 
     def blob_detection(self, matrix):
         """
@@ -63,12 +80,14 @@ class GridEyeProtocol(FerbProtocol):
         - matrix (numpy.ndarray): An 8x8 matrix of temperature values.
 
         Returns:
-        - List of dictionaries: Each dictionary represents the blob with its coordinates and person count.
+        - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
         """
         THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
 
         blobs = []
         visited = set()
+
+        # TODO: try limiting the blob size
 
         # Define a function to perform depth-first search (DFS)
         def dfs(row, col, blob):
@@ -120,6 +139,9 @@ class GridEyeProtocol(FerbProtocol):
             # Replace the blob with its pixel count and adjusted person count
             blobs[blobs.index(blob)] = blob_data
         
+        total_count = sum(blob['person_count'] for blob in blobs)
+        print("Total count:", total_count)
+
         return blobs
 
 if __name__ == "__main__":
@@ -127,5 +149,8 @@ if __name__ == "__main__":
         server = Server()
         asyncio.run(server.start_server(GridEyeProtocol))
         
-    except KeyboardInterrupt as k:
+    except KeyboardInterrupt:
         print("\nGoodbye cruel world\n")
+
+    # Quit Pygame
+    pygame.quit()
