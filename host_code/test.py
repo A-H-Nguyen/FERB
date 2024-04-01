@@ -1,8 +1,17 @@
 import asyncio
+import pygame
 import numpy as np
 
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 from scipy.interpolate import RegularGridInterpolator
+
+
+# Constants for Pygame visualization
+WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 400
+PIXEL_SIZE = 50
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 
 # Number of pixels for both original Grid-EYE output, and interpolated output
 _GRID_LEN = 8
@@ -35,13 +44,10 @@ class GridEyeProtocol(FerbProtocol):
         self.cal_counter += 1
 
         if self.cal_counter > 5:
-            print("Before division for mean:")
-            print(self.background)
             self.background = self.background / 5 # Hardcode this value instead
                                                   # I was using the counter for some fucking reason
             self.cal_finished = True
             print("\nCalibrating done.")
-            print(self.background)
             print("\n-----------------------------------------\n")
 
     def convert_to_grayscale(self, value) -> int:
@@ -90,20 +96,18 @@ class GridEyeProtocol(FerbProtocol):
         interp_matrix = interp_func((self.interp_Y, self.interp_X))
         
         if not self.cal_finished:
-            print(f"Calibration step #{self.cal_counter}")
-            print(interp_matrix)
             self.calibrate(interp_matrix)
             return
         
         diff_matrix = np.round(interp_matrix - self.background) 
         # print(diff_matrix)
-        # self.normalize_data(diff_matrix)
+        self.normalize_data(diff_matrix)
         # for row in range(_INTRP_LEN):
         #     for col in range(_INTRP_LEN):
         #         print(diff_matrix[row,col], end='  ')
         #     print('\n')
-        print(interp_matrix)
-        print(diff_matrix)
+        # print(interp_matrix)
+        # print(diff_matrix)
         print("\n-----------------------------------------\n")
 
 
