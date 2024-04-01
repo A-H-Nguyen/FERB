@@ -8,7 +8,6 @@ WINDOW_WIDTH = 400
 WINDOW_HEIGHT = 400
 PIXEL_SIZE = 50
 WHITE = (255, 255, 255)
-RED = (255, 0, 0)
 BLACK = (0, 0, 0)
 
 class GridEyeProtocol(FerbProtocol):
@@ -24,53 +23,62 @@ class GridEyeProtocol(FerbProtocol):
         self.data_history = []
 
     def handle_data(self, data):
-        msg = data.decode()
+        try:
+            msg = data.decode()
+            print(msg)
 
-        if msg[0] == "~":
-            print("Skipped")
-            return
-        
-        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
-        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+            if msg[0] == "~":
+                print("Skipped")
+                return
+            
+            # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+            data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
 
-        # Reshape the array to form an 8x8 matrix
-        matrix = data_array.reshape((8, 8))
+            # Reshape the array to form an 8x8 matrix
+            matrix = data_array.reshape((8, 8))
 
-        detected_blobs = self.blob_detection(matrix)
-        total_count = sum(blob['person_count'] for blob in detected_blobs)
-        print("Total count:", total_count)
+            detected_blobs = self.blob_detection(matrix)
+            total_count = sum(blob['person_count'] for blob in detected_blobs)
+            print("Total count:", total_count)
 
-        # Update heatmap visualization
-        self.update_heatmap(matrix)
+            # Update heatmap visualization
+            self.update_heatmap(matrix)
 
-        # Append data to history
-        self.data_history.append({
-            'matrix': matrix,
-            'blobs': detected_blobs
-        })
+            # Append data to history
+            self.data_history.append({
+                'matrix': matrix,
+                'blobs': detected_blobs
+            })
+        except Exception as e:
+            print(f"error: {e}")
 
     def update_heatmap(self, matrix):
-        # Clear the window
-        self.window.fill(WHITE)
+        # Only update if the matrix has changed
+        if self.data_history and np.array_equal(matrix, self.data_history[-1]['matrix']):
+            return
 
-        # Draw the heatmap
+        # Clear the window with a black background
+        self.window.fill(BLACK)
+
+        # Determine the intensity for the entire matrix at once
+        intensity_matrix = np.where(matrix > 24, 255, 0)
+
+        # Draw the heatmap, updating only the pixels that have changed
         for x in range(8):
             for y in range(8):
-                # Scale the temperature to heatmap intensity
-                intensity = int(((30 - matrix[x, y]) / 30) * 255)  # Temperature range: 0 to 30 degrees Celsius
-                # Ensure intensity is within valid range [0, 255]
-                intensity = max(0, min(intensity, 255))
-                # Invert intensity for black (hot temperatures) and white (cold temperatures)
-                color = (intensity, intensity, intensity)
-                # Draw a rectangle for each pixel in the heatmap data
-                pygame.draw.rect(self.window, color, (x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE))
+                # Check if the pixel has changed
+                if not self.data_history or matrix[x, y] != self.data_history[-1]['matrix'][x, y]:
+                    # Determine the rectangle's position and size
+                    rect_position = (x * PIXEL_SIZE, y * PIXEL_SIZE)
+                    rect_size = (PIXEL_SIZE, PIXEL_SIZE)
+                    # Draw a rectangle for the pixel if it has changed
+                    pygame.draw.rect(self.window, (intensity_matrix[x, y], intensity_matrix[x, y], intensity_matrix[x, y]), (rect_position, rect_size))
 
         # Update the display
         pygame.display.flip()
 
         # Cap the frame rate
-        self.clock.tick(30)
-
+        self.clock.tick(60)  # Adjust as needed
 
     def blob_detection(self, matrix):
         """
@@ -134,6 +142,9 @@ class GridEyeProtocol(FerbProtocol):
 
                 elif pixel_count >= 7 and pixel_count <= 8:
                     person_count = 4
+                
+                elif pixel_count >= 9:
+                    person_count = 5
 
             blob_data = {'coordinates': blob, 'person_count': person_count}
             # Replace the blob with its pixel count and adjusted person count
