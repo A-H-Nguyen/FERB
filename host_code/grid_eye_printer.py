@@ -6,6 +6,9 @@ from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 
 class GridEyeProtocol(FerbProtocol):
     def handle_data(self, data):
+        if len(data) != 128:
+            return
+
         # Convert the bytearray to a numpy array of 16-bit integers (short ints)
         data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
 
