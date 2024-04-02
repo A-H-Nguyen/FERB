@@ -3,10 +3,11 @@
 #####################################
 
 import tkinter as tk
-# import os
+import datetime
 import sys
 import subprocess
 import threading
+import random
 
 from echo_server import EchoProtocol
 from server_base import Server
@@ -14,22 +15,8 @@ from tkinter import ttk
 
 
 # Width and Height of the Raspberry Pi screen
-SCREEN_WIDTH = 800  # root.winfo_screenwidth()
-SCREEN_HEIGHT = 400 # root.winfo_screenheight()
-
-
-# def run(target):
-#     threading.Thread(target=target).start()
-
-def ping():
-    print("Thread: start")
-    p = subprocess.Popen("ping -c 4 stackoverflow.com".split(), 
-                         stdout=subprocess.PIPE, bufsize=1, text=True)
-    while p.poll() is None:
-        msg = p.stdout.readline().strip() # read a line from the process output
-        if msg:
-            print(msg)
-    print("Thread: end")
+SCREEN_WIDTH = 800  # self.winfo_screenwidth()
+SCREEN_HEIGHT = 400 # self.winfo_screenheight()
 
 
 # Redirect text outputs from the terminal
@@ -47,49 +34,133 @@ class Redirect():
        pass
 
 
+class FERBApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        self.title('FERB GUI')
+        self.attributes('-fullscreen',True)
+
+        self.grid_columnconfigure(0, weight = 1)
+        self.grid_columnconfigure(1, weight = 1)
+        self.grid_columnconfigure(2, weight = 2)
+        
+        left_frame = tk.Frame(self, width=400, height=400)
+        server_frame = tk.Frame(left_frame, borderwidth=5, relief="ridge", width=395, height=250)
+        self.server_text = tk.Text(server_frame)
+        
+        cam_button = tk.Button(left_frame, text="new colors", command=self.draw_thermal_image)
+        close_button = tk.Button(left_frame, text="Quit", command=self.destroy)
+
+        right_frame = tk.Frame(self, width=400, height=400)
+        self.canvas = tk.Canvas(right_frame, width=400, height=400)
+
+        left_frame.grid(row=0, column=0)
+        server_frame.grid(row=0, column=0, columnspan=2, sticky = "nesw")
+        self.server_text.grid(row=0, column=0, sticky="ns")
+
+        cam_button.grid(row=1, column=0, sticky="ew")
+        close_button.grid(row=1, column=1, sticky="ew")
+
+        right_frame.grid(row=0, column=1)
+        self.canvas.grid(row=0, column=2, rowspan=2, sticky="nesw")
+
+        left_frame.grid_propagate(False)
+        server_frame.grid_propagate(False)
+        right_frame.grid_propagate(False)
+
+    def draw_thermal_image(self):
+        print(f"{datetime.datetime.now()}: new colors!")
+        for row in range(16):
+            for col in range(16):
+                temp = random.randint(1,3)
+                if temp == 1:
+                    color = "blue"
+                elif temp == 2:
+                    color = "green"
+                else:
+                    color = "yellow"
+                x0 = col * 24
+                y0 = row * 24
+                x1 =  x0 + 24
+                y1 =  y0 + 24
+                self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline='')
 
 
 if __name__ == "__main__":
+    # Create FERB GUI App
+    app = FERBApp()
+
+    # Overwrite system stdout
+    old_stdout = sys.stdout    
+    sys.stdout = Redirect(app.server_text)
+
     # Create echo server 
     server = Server(protocol_class=EchoProtocol)
 
-    # Create root window of tkinter app
-    root = tk.Tk()
-    root.title('FERB GUI')
+    # Run GUI and server
+    threading.Thread(target=server.run).start()
+    app.mainloop()
 
-    root.attributes('-fullscreen',True)
 
-    frame = tk.Frame(root)
-    frame.pack(expand=True, fill='both')
 
-    text = tk.Text(frame)
-    text.pack(side='left', fill='both', expand=True)
 
-    scrollbar = tk.Scrollbar(frame)
-    scrollbar.pack(side='right', fill='y')
+# if __name__ == "__main__":
+    # Create echo server 
+    # server = Server(protocol_class=EchoProtocol)
 
-    text['yscrollcommand'] = scrollbar.set
-    scrollbar['command'] = text.yview
+    # # Create self window of tkinter app
+    # self = tk.Tk()
+    # self.title('FERB GUI')
+    # self.geometry("800x400")
 
-    old_stdout = sys.stdout    
-    sys.stdout = Redirect(text)
+    # self.attributes('-fullscreen',True)
 
-    # This line sets the icon for the tkinter app
-    # root.iconbitmap('path')
+    # self.grid_columnconfigure(0, weight = 1)
+    # self.grid_columnconfigure(1, weight = 1)
+    # self.grid_rowconfigure(0, weight = 1)
 
-    # place a label on the root window
-    message = tk.Label(root, text="Hello, World!")
-    message.pack()
+    # calc = tk.Frame(self, bg = "red")
+    # calc.grid(row = 0, column = 0, sticky = "nesw")
+    # history = tk.Frame(self, bg = "blue")
+    # history.grid(row = 0, column = 1, sticky = "nesw")
 
-    # ttk.Button(root, text='Click Me', command=button_clicked).pack()
-    # ttk.Button(root, text='RUN SERVER', command=lambda:run(server.run)).pack()
-    # ttk.Button(root, text='STOP SERVER', command=server.stop).pack()
+    # # close button
+    # close_button = ttk.Button(self, text="Quit", command=self.destroy)
+    # close_button.grid(column=0, row=0, sticky=tk.EW)
+
+
+    # frame = tk.Frame(self)
+    # frame.pack(expand=True, fill='both')
+
+    # text = tk.Text(frame)
+    # text.pack(side='left', fill='both', expand=True)
+
+    # scrollbar = tk.Scrollbar(frame)
+    # scrollbar.pack(side='right', fill='y')
+
+    # text['yscrollcommand'] = scrollbar.set
+    # scrollbar['command'] = text.yview
+
+    # old_stdout = sys.stdout    
+    # sys.stdout = Redirect(text)
+
+    # # This line sets the icon for the tkinter app
+    # # self.iconbitmap('path')
+
+    # # place a label on the self window
+    # message = tk.Label(self, text="Hello, World!")
+    # message.pack()
+
+    # ttk.Button(self, text='Click Me', command=button_clicked).pack()
+    # ttk.Button(self, text='RUN SERVER', command=lambda:run(server.run)).pack()
+    # ttk.Button(self, text='STOP SERVER', command=server.stop).pack()
     
-    ttk.Button(root, text="Quit", command=root.destroy).pack() 
+    # ttk.Button(self, text="Quit", command=self.destroy).pack() 
 
     # Run server and GUI
-    threading.Thread(target=server.run).start()
-    root.mainloop()
+    # threading.Thread(target=server.run).start()
+    # self.mainloop()
 
 
 
