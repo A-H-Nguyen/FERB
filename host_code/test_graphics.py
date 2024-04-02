@@ -3,11 +3,13 @@
 #####################################
 
 import tkinter as tk
-import os
+# import os
 import sys
 import subprocess
 import threading
 
+from echo_server import EchoProtocol
+from server_base import Server
 from tkinter import ttk
 
 
@@ -16,25 +18,21 @@ SCREEN_WIDTH = 800  # root.winfo_screenwidth()
 SCREEN_HEIGHT = 400 # root.winfo_screenheight()
 
 
-def test():
-    print('Button clicked')
-
-def run(target):
-    threading.Thread(target=target).start()
+# def run(target):
+#     threading.Thread(target=target).start()
 
 def ping():
     print("Thread: start")
-
-    p = subprocess.Popen("ping -c 4 stackoverflow.com".split(), stdout=subprocess.PIPE, bufsize=1, text=True)
+    p = subprocess.Popen("ping -c 4 stackoverflow.com".split(), 
+                         stdout=subprocess.PIPE, bufsize=1, text=True)
     while p.poll() is None:
         msg = p.stdout.readline().strip() # read a line from the process output
         if msg:
             print(msg)
-
     print("Thread: end")
 
 
-# Redirect the out stream for the terminal
+# Redirect text outputs from the terminal
 class Redirect():
     def __init__(self, widget, autoscroll=True):
         self.widget = widget
@@ -49,43 +47,49 @@ class Redirect():
        pass
 
 
-# Create root window of tkinter app
-root = tk.Tk()
-root.title('FERB GUI')
 
-# This line forces the root window to always be on top of the stack
-# root.attributes('-topmost', 1)
 
-root.attributes('-fullscreen',True)
+if __name__ == "__main__":
+    # Create echo server 
+    server = Server(protocol_class=EchoProtocol)
 
-frame = tk.Frame(root)
-frame.pack(expand=True, fill='both')
+    # Create root window of tkinter app
+    root = tk.Tk()
+    root.title('FERB GUI')
 
-text = tk.Text(frame)
-text.pack(side='left', fill='both', expand=True)
+    root.attributes('-fullscreen',True)
 
-scrollbar = tk.Scrollbar(frame)
-scrollbar.pack(side='right', fill='y')
+    frame = tk.Frame(root)
+    frame.pack(expand=True, fill='both')
 
-text['yscrollcommand'] = scrollbar.set
-scrollbar['command'] = text.yview
+    text = tk.Text(frame)
+    text.pack(side='left', fill='both', expand=True)
 
-old_stdout = sys.stdout    
-sys.stdout = Redirect(text)
+    scrollbar = tk.Scrollbar(frame)
+    scrollbar.pack(side='right', fill='y')
 
-# This line sets the icon for the tkinter app
-# root.iconbitmap('path')
+    text['yscrollcommand'] = scrollbar.set
+    scrollbar['command'] = text.yview
 
-# # place a label on the root window
-# message = tk.Label(root, text="Hello, World!")
-# message.pack()
+    old_stdout = sys.stdout    
+    sys.stdout = Redirect(text)
 
-# ttk.Button(root, text='Click Me', command=button_clicked).pack()
-ttk.Button(root, text='TEST', command=test).pack()
-ttk.Button(root, text='PING', command=lambda:run(ping)).pack()
-ttk.Button(root, text="Quit", command=root.destroy).pack() 
+    # This line sets the icon for the tkinter app
+    # root.iconbitmap('path')
 
-root.mainloop()
+    # place a label on the root window
+    message = tk.Label(root, text="Hello, World!")
+    message.pack()
+
+    # ttk.Button(root, text='Click Me', command=button_clicked).pack()
+    # ttk.Button(root, text='RUN SERVER', command=lambda:run(server.run)).pack()
+    # ttk.Button(root, text='STOP SERVER', command=server.stop).pack()
+    
+    ttk.Button(root, text="Quit", command=root.destroy).pack() 
+
+    # Run server and GUI
+    threading.Thread(target=server.run).start()
+    root.mainloop()
 
 
 
