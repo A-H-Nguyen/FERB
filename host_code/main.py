@@ -1,81 +1,95 @@
-"""
-Main file for the FERB GUI
-"""
 import sys
 import threading
-import tkinter as tk
+import numpy as np
 
-from server_base import Server
-from thermal_cam import GridEyeProtocol
+from FERB_GUI import FERBApp, Redirect
+from scipy.interpolate import RegularGridInterpolator
+from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
+from thermal_cam import ThermalCam
 
+
+# Number of pixels for both original Grid-EYE output, and interpolated output
+_GRID_LEN = 8
+_INTRP_LEN = 16
+_GRAYSCALE = 255
+
+# Default values for range of temps post-background subtraction
+_MIN_VAL = 0
+_MAX_VAL = 5
 
 # Width and Height of the Raspberry Pi screen
-SCREEN_WIDTH = 800  # self.winfo_screenwidth()
-SCREEN_HEIGHT = 400 # self.winfo_screenheight()
+SCREEN_WIDTH = 800  
+SCREEN_HEIGHT = 400 
 
 
-class Redirect():
-    """
-    We use this to redirect text output from functions like `print` into
-    the tkinter widget of our choosing
-    """
-    def __init__(self, widget, autoscroll=True):
-        self.widget = widget
-        self.autoscroll = autoscroll
-
-    def write(self, text):
-        self.widget.insert('end', text)
-        if self.autoscroll:
-            self.widget.see("end")  # autoscroll
-
-    def flush(self):
-       pass
-
-
-class FERBApp(tk.Tk):
-    def __init__(self):
+class GridEyeProtocol(FerbProtocol):
+    def __init__(self, app: FERBApp, screen_len):
         super().__init__()
 
-        self.title('FERB GUI')
-        self.attributes('-fullscreen',True)
-
-        self.grid_columnconfigure(0, weight = 1)
-        self.grid_columnconfigure(1, weight = 1)
-        self.grid_columnconfigure(2, weight = 2)
+        self.app = app
+        self.cam = ThermalCam(app.canvas, screen_len)
         
-        self.left_frame = tk.Frame(self, width=400, height=400)
-        self.right_frame = tk.Frame(self, width=400, height=400)
+        # Generate x and y coordinates for the original and interpolated Grid-EYE output
+        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
+        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
+        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
 
-        self.left_frame.grid(row=0, column=0)
-        self.right_frame.grid(row=0, column=1)
-
-        self.left_frame.grid_propagate(False)
-        self.right_frame.grid_propagate(False)
-
-        self.create_canvas()
-        self.create_terminal_log()
-        self.create_buttons()
-
-    def create_buttons(self):
-        # cam_button = tk.Button(self.left_frame, text="new colors", command=self.draw_thermal_image)
-        # cam_button.grid(row=1, column=0, sticky="ew")
-
-        # I'm not sure we even WANT a stupid quit button
-        close_button = tk.Button(self.left_frame, text="Quit", command=self.destroy)
-        close_button.grid(row=1, column=1, sticky="ew")
-
-    def create_canvas(self):
-        server_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=250)
-        self.server_text = tk.Text(server_frame)
+        # Used for background subtraction
+        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
         
-        server_frame.grid(row=0, column=0, columnspan=2) #, sticky = "nesw")
-        self.server_text.grid(row=0, column=0, sticky="ns")
+        # Variables for calibration sequence
+        self.cal_finished = True
+        self.cal_counter = 1
 
-        server_frame.grid_propagate(False)
+    def calibrate(self, input_matrix) -> None:
+        self.background += input_matrix
+        self.cal_counter += 1
 
-    def create_terminal_log(self):
-        self.canvas = tk.Canvas(self.right_frame, width=400, height=400)
-        self.canvas.grid(row=0, column=2, rowspan=2, sticky="nesw")
+        if self.cal_counter > 5:
+            self.background /= 5 # Hardcode this value instead
+                                 # I was using the counter for some fucking reason
+            self.cal_finished = True
+            self.print_timestamp("Calibration finished.")
+    
+    def handle_data(self, data):
+        try:
+            msg = data.decode()
+            if msg[0] == '~':
+                # start calibration sequence here
+                self.print_timestamp("Calibrating sensor. Get the fuck out of the way")
+                self.cal_finished = False
+                return
+
+            # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+            data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+            if data_array.size != 64:
+                self.print_timestamp("Bad packet")
+                return
+
+            # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+            data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+            interp_func = RegularGridInterpolator((self.orig_coords, 
+                                                   self.orig_coords), 
+                                                   data_array.reshape((8,8)))
+            temperatures = interp_func((self.interp_Y, self.interp_X))
+            
+            if not self.cal_finished:
+                self.calibrate(temperatures)
+                return
+            
+            diff_matrix = np.clip(np.round(temperatures - self.background),
+                                  _MIN_VAL, _MAX_VAL)
+            self.cam.draw_thermal_image(diff_matrix)
+
+            self.trigger_custom_event(np.random.randint(0,100))
+        
+        except Exception as e:
+            print(f"error: {e}")
+    
+    def trigger_custom_event(self, data):
+        # Trigger the custom event
+        self.app.event_generate("<<CustomEvent>>", when="tail", data=data)
 
 
 if __name__ == "__main__":
@@ -87,7 +101,7 @@ if __name__ == "__main__":
     old_stdout = sys.stdout    
     sys.stdout = Redirect(app.server_text)
 
-    server = Server(lambda:GridEyeProtocol(app.canvas, SCREEN_HEIGHT))
+    server = Server(lambda:GridEyeProtocol(app, SCREEN_HEIGHT))
 
     # Run GUI and server
     threading.Thread(target=server.run).start()

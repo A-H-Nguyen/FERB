@@ -126,45 +126,6 @@ class FERBApp(tk.Tk):
         self.canvas.grid(row=0, column=1, rowspan=2, sticky="nesw")
 
 
-class CustomEventDemo(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("Custom Event Demo")
-
-        self.label = tk.Label(self, text="Custom event not triggered yet")
-        self.label.pack()
-
-        self.bind("<<CustomEvent>>", self.handle_custom_event)
-
-        # Queue for thread-safe communication
-        self.event_queue = queue.Queue()
-
-        # Start a separate thread to monitor the event queue
-        self.event_thread = threading.Thread(target=self.event_listener)
-        self.event_thread.daemon = True  # Thread will terminate when main thread ends
-        self.event_thread.start()
-
-    def event_listener(self):
-        while True:
-            # Block until an event is received
-            event = self.event_queue.get()
-
-            # Trigger the custom event
-            self.event_generate("<<CustomEvent>>", when="tail")
-
-    def handle_custom_event(self, event):
-        self.label.config(text="Custom event triggered!")
-
-    def trigger_custom_event(self):
-        # Put an event into the queue to trigger the custom event
-        self.event_queue.put("trigger_event")
-
-
-# if __name__ == "__main__":
-#     app = CustomEventDemo()
-#     app.mainloop()
-
-
 
 def dummy():
     pass
