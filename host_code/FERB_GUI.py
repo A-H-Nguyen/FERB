@@ -1,6 +1,7 @@
 """
 Main file for the FERB GUI
 """
+import numpy as np
 import tkinter as tk
 import threading
 import queue  
@@ -67,17 +68,17 @@ class FERBApp(tk.Tk):
             event = self.event_queue.get()
 
             # Trigger the custom event
-            self.event_generate("<<CustomEvent>>", when="tail")
+            self.event_generate("<<CustomEvent>>", when="tail", data=event.data)
 
     def handle_custom_event(self, event):
         # self.counter.delete("1.0", "end")
-        print(event.data)
+        # print(event.data)
         try:
             # self.counter.insert("1.0", str(event.data))
             self.counter.config(text=str(event.data))
         except:
             # self.counter.insert("1.0", "Fuck.")
-            self.counter.config(text="Fuck")
+            self.counter.config(text="Fuck" + str(np.random.randint(0,100)))
 
     # def trigger_custom_event(self, data):
     #     # Put an event into the queue to trigger the custom event

@@ -35,7 +35,8 @@ class GridEyeProtocol(FerbProtocol):
         self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
 
         # Used for background subtraction
-        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+        # self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+        self.background = np.zeros(shape=(_GRID_LEN, _GRID_LEN))
         
         # Variables for calibration sequence
         self.cal_finished = True
@@ -69,18 +70,24 @@ class GridEyeProtocol(FerbProtocol):
 
             # Convert the bytearray to a numpy array of 16-bit integers (short ints)
             data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
-            interp_func = RegularGridInterpolator((self.orig_coords, 
-                                                   self.orig_coords), 
-                                                   data_array.reshape((8,8)))
-            temperatures = interp_func((self.interp_Y, self.interp_X))
+            temp_array = data_array.reshape((8,8))
             
             if not self.cal_finished:
-                self.calibrate(temperatures)
+                self.calibrate(temp_array)
                 return
-            
-            diff_matrix = np.clip(np.round(temperatures - self.background),
-                                  _MIN_VAL, _MAX_VAL)
+           
+            diff_matrix = np.clip(np.round(temp_array - self.background), _MIN_VAL, _MAX_VAL)
             self.cam.draw_thermal_image(diff_matrix)
+            
+            # interp_func = RegularGridInterpolator((self.orig_coords, 
+            #                                        self.orig_coords), temp_array)
+            # temp_intrp = interp_func((self.interp_Y, self.interp_X))
+            
+            # if not self.cal_finished:
+            #     self.calibrate(temp_intrp)
+            #     return
+            
+            # diff_matrix = np.clip(np.round(temp_intrp - self.background), _MIN_VAL, _MAX_VAL)
 
             self.trigger_custom_event(np.random.randint(0,100))
         
