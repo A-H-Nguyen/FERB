@@ -3,15 +3,16 @@
 #####################################
 
 import tkinter as tk
+import numpy as np
 import datetime
 import sys
 import threading
-import random
+import queue  # For thread-safe communication between threads
 
 # from echo_server import EchoProtocol
-from server_base import Server
-from thermal_cam import GridEyeProtocol
-from tkinter import ttk
+# from server_base import Server
+from thermal_cam import ThermalCam
+# from tkinter import ttk
 
 
 # Width and Height of the Raspberry Pi screen
@@ -37,60 +38,167 @@ class Redirect():
 class FERBApp(tk.Tk):
     def __init__(self):
         super().__init__()
-
         self.title('FERB GUI')
         self.attributes('-fullscreen',True)
+
+        self.bind("<<CustomEvent>>", self.handle_custom_event)
+
+        # Queue for thread-safe communication
+        self.event_queue = queue.Queue()
+
+        # Start a separate thread to monitor the event queue
+        self.event_thread = threading.Thread(target=self.event_listener)
+        self.event_thread.daemon = True  # Thread will terminate when main thread ends
+        self.event_thread.start()
 
         self.grid_columnconfigure(0, weight = 1)
         self.grid_columnconfigure(1, weight = 1)
         self.grid_columnconfigure(2, weight = 2)
+        self.grid_rowconfigure(0, weight = 2)
+        self.grid_rowconfigure(1, weight = 2)
+        self.grid_rowconfigure(2, weight = 1)
         
-        left_frame = tk.Frame(self, width=400, height=400)
-        server_frame = tk.Frame(left_frame, borderwidth=5, relief="ridge", width=395, height=250)
+        self.left_frame = tk.Frame(self, width=400, height=400)
+        self.right_frame = tk.Frame(self, width=400, height=400)
+
+        self.left_frame.grid(row=0, column=0)
+        self.right_frame.grid(row=0, column=1)
+
+        self.left_frame.grid_propagate(False)
+        # self.right_frame.grid_propagate(False)
+
+        self.create_canvas()
+        self.create_terminal_log()
+        self.create_person_counter()
+        self.create_buttons()
+
+        self.cam = ThermalCam(self.canvas, SCREEN_HEIGHT)
+        self.cam.draw_thermal_image(np.random.randint(0, 6, size=(16, 16)))
+
+    def event_listener(self):
+        while True:
+            # Block until an event is received
+            event = self.event_queue.get()
+
+            # Trigger the custom event
+            self.event_generate("<<CustomEvent>>", when="tail")
+
+    def handle_custom_event(self, event):
+        self.cam.draw_thermal_image(np.random.randint(0, 6, size=(16, 16)))
+
+    def trigger_custom_event(self):
+        # Put an event into the queue to trigger the custom event
+        self.event_queue.put("trigger_event")
+    
+    def create_buttons(self):
+        # cam_button = tk.Button(self.left_frame, text="new colors", command=self.draw_thermal_image)
+        # cam_button.grid(row=1, column=0, sticky="ew")
+
+        # I'm not sure we even WANT a stupid quit button
+        close_button = tk.Button(self.left_frame, text="Quit", command=self.destroy)
+        close_button.grid(row=2, column=0, sticky="ew")
+        
+        event_button = tk.Button(self.right_frame, text="Event", command=self.trigger_custom_event)
+        event_button.grid(row=2, column=1, sticky="ew")
+
+    def create_terminal_log(self):
+        server_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
         self.server_text = tk.Text(server_frame)
+        self.server_text.insert("1.0", "SERVER IS RUNNING")
         
-        hey_button = tk.Button(left_frame, text="HEY", command=hey)
-        close_button = tk.Button(left_frame, text="Quit", command=self.destroy)
-
-        right_frame = tk.Frame(self, width=400, height=400)
-        self.canvas = tk.Canvas(right_frame, width=400, height=400)
-
-        left_frame.grid(row=0, column=0)
-        server_frame.grid(row=0, column=0, columnspan=2, sticky = "nesw")
+        server_frame.grid(row=0, column=0) #, sticky = "nesw")
         self.server_text.grid(row=0, column=0, sticky="ns")
 
-        hey_button.grid(row=1, column=0, sticky="ew")
-        close_button.grid(row=1, column=1, sticky="ew")
-
-        right_frame.grid(row=0, column=1)
-        self.canvas.grid(row=0, column=2, rowspan=2, sticky="nesw")
-
-        left_frame.grid_propagate(False)
         server_frame.grid_propagate(False)
-        right_frame.grid_propagate(False)
+    
+    def create_person_counter(self):
+        counter_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
+        self.counter = tk.Text(counter_frame)
+        self.counter.insert("1.0", "PLACEHOLDER")
+        
+        counter_frame.grid(row=1, column=0) #, sticky = "nesw")
+        self.counter.grid(row=1, column=0, sticky="ns")
 
+        counter_frame.grid_propagate(False)
+
+    def create_canvas(self):
+        self.canvas = tk.Canvas(self.right_frame, width=400, height=400)
+        self.canvas.grid(row=0, column=1, rowspan=2, sticky="nesw")
+
+
+class CustomEventDemo(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Custom Event Demo")
+
+        self.label = tk.Label(self, text="Custom event not triggered yet")
+        self.label.pack()
+
+        self.bind("<<CustomEvent>>", self.handle_custom_event)
+
+        # Queue for thread-safe communication
+        self.event_queue = queue.Queue()
+
+        # Start a separate thread to monitor the event queue
+        self.event_thread = threading.Thread(target=self.event_listener)
+        self.event_thread.daemon = True  # Thread will terminate when main thread ends
+        self.event_thread.start()
+
+    def event_listener(self):
+        while True:
+            # Block until an event is received
+            event = self.event_queue.get()
+
+            # Trigger the custom event
+            self.event_generate("<<CustomEvent>>", when="tail")
+
+    def handle_custom_event(self, event):
+        self.label.config(text="Custom event triggered!")
+
+    def trigger_custom_event(self):
+        # Put an event into the queue to trigger the custom event
+        self.event_queue.put("trigger_event")
+
+
+# if __name__ == "__main__":
+#     app = CustomEventDemo()
+#     app.mainloop()
+
+
+
+def dummy():
+    pass
 
 def hey():
     print("hey")
 
+def update_text(text_widget:tk.Text):
+    text_widget.delete("1.0", "end")
+
+    # Insert new text
+    new_text = "Hello, World!"
+    text_widget.insert("1.0", new_text)
+
 
 if __name__ == "__main__":
-    # Create FERB GUI App
+    # # Create FERB GUI App
     app = FERBApp()
 
-    # Overwrite system stdout
-    old_stdout = sys.stdout    
-    sys.stdout = Redirect(app.server_text)
+    # # Overwrite system stdout
+    # # old_stdout = sys.stdout    
+    # # sys.stdout = Redirect(app.server_text)
 
-    # Create echo server 
-    # server = Server(protocol_class=EchoProtocol)
-    server = Server(lambda:GridEyeProtocol(app.canvas, SCREEN_HEIGHT))
-    # server = Server(lambda:GridEyeProtocol('slkdf'))
+    # # Create echo server 
+    # # server = Server(protocol_class=EchoProtocol)
+    # # server = Server(lambda:GridEyeProtocol(app.canvas, SCREEN_HEIGHT))
+    # # server = Server(lambda:GridEyeProtocol('slkdf'))
 
-    # Run GUI and server
-    threading.Thread(target=server.run).start()
+    # # Run GUI and server
+    # # threading.Thread(target=server.run).start()
+
+
+    # app = CustomEventDemo()
     app.mainloop()
-
 
 
 
