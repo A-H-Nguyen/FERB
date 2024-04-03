@@ -50,7 +50,7 @@ class FerbProtocol(asyncio.Protocol):
 
     def print_timestamp(self, message):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        print(f"{timestamp}: {message}")
+        print(f"{timestamp}\n{message}\n")
 
 
 class CLI:

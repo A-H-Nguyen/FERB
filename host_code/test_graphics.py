@@ -5,12 +5,12 @@
 import tkinter as tk
 import datetime
 import sys
-import subprocess
 import threading
 import random
 
-from echo_server import EchoProtocol
+# from echo_server import EchoProtocol
 from server_base import Server
+from thermal_cam import GridEyeProtocol
 from tkinter import ttk
 
 
@@ -49,7 +49,7 @@ class FERBApp(tk.Tk):
         server_frame = tk.Frame(left_frame, borderwidth=5, relief="ridge", width=395, height=250)
         self.server_text = tk.Text(server_frame)
         
-        cam_button = tk.Button(left_frame, text="new colors", command=self.draw_thermal_image)
+        hey_button = tk.Button(left_frame, text="HEY", command=hey)
         close_button = tk.Button(left_frame, text="Quit", command=self.destroy)
 
         right_frame = tk.Frame(self, width=400, height=400)
@@ -59,7 +59,7 @@ class FERBApp(tk.Tk):
         server_frame.grid(row=0, column=0, columnspan=2, sticky = "nesw")
         self.server_text.grid(row=0, column=0, sticky="ns")
 
-        cam_button.grid(row=1, column=0, sticky="ew")
+        hey_button.grid(row=1, column=0, sticky="ew")
         close_button.grid(row=1, column=1, sticky="ew")
 
         right_frame.grid(row=0, column=1)
@@ -69,22 +69,9 @@ class FERBApp(tk.Tk):
         server_frame.grid_propagate(False)
         right_frame.grid_propagate(False)
 
-    def draw_thermal_image(self):
-        print(f"{datetime.datetime.now()}: new colors!")
-        for row in range(16):
-            for col in range(16):
-                temp = random.randint(1,3)
-                if temp == 1:
-                    color = "blue"
-                elif temp == 2:
-                    color = "green"
-                else:
-                    color = "yellow"
-                x0 = col * 24
-                y0 = row * 24
-                x1 =  x0 + 24
-                y1 =  y0 + 24
-                self.canvas.create_rectangle(x0, y0, x1, y1, fill=color, outline='')
+
+def hey():
+    print("hey")
 
 
 if __name__ == "__main__":
@@ -96,7 +83,9 @@ if __name__ == "__main__":
     sys.stdout = Redirect(app.server_text)
 
     # Create echo server 
-    server = Server(protocol_class=EchoProtocol)
+    # server = Server(protocol_class=EchoProtocol)
+    server = Server(lambda:GridEyeProtocol(app.canvas, SCREEN_HEIGHT))
+    # server = Server(lambda:GridEyeProtocol('slkdf'))
 
     # Run GUI and server
     threading.Thread(target=server.run).start()
