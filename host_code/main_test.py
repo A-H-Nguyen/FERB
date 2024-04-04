@@ -52,7 +52,7 @@ class GridEyeProtocol(FerbProtocol):
         Returns:
         - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
         """
-        THRESHOLD_TEMP = 215  # Define a threshold temperature value to consider as part of a blob
+        THRESHOLD_TEMP = 170  # Define a threshold temperature value to consider as part of a blob
 
         blobs = []
         visited = set()
@@ -87,7 +87,7 @@ class GridEyeProtocol(FerbProtocol):
                     dfs(i, j, blob)
                     blobs.append(blob)
 
-        pixel_per_person = np.round(self.pixel_occupancy(GRID_EYE_HEIGHT))
+        pixel_per_person = self.pixel_occupancy(GRID_EYE_HEIGHT)
         print(pixel_per_person)
 
         # Iterate through pixels of each blob
@@ -96,13 +96,13 @@ class GridEyeProtocol(FerbProtocol):
             person_count = 0
             for pixel in blob:
                 # Check amount of pixels in blob
-                if pixel_count < pixel_per_person * 1.5:
+                if pixel_count < pixel_per_person * 2:
                     person_count = 1
 
-                elif pixel_count >= pixel_per_person * 1.5 and pixel_count < pixel_per_person * 2.5:
+                elif pixel_count >= pixel_per_person * 2 and pixel_count < pixel_per_person * 3:
                     person_count = 2
 
-                elif pixel_count >= pixel_per_person * 2.5 and pixel_count < pixel_per_person * 3.5:
+                elif pixel_count >= pixel_per_person * 3 and pixel_count < pixel_per_person * 4:
                     person_count = 3
 
                 elif pixel_count >= pixel_per_person * 3.5 and pixel_count < pixel_per_person * 4.5:
@@ -224,6 +224,5 @@ class GridEyeProtocol(FerbProtocol):
 #     app.mainloop()
 
 if __name__ == "__main__":
-    print('urmom')
     server = Server(lambda:GridEyeProtocol(SCREEN_HEIGHT))
     server.run()
