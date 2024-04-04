@@ -1,4 +1,3 @@
-import asyncio
 import numpy as np
 
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
@@ -21,8 +20,8 @@ class GridEyeProtocol(FerbProtocol):
 
 if __name__ == "__main__":
     try:
-        server = Server()
-        asyncio.run(server.start_server(GridEyeProtocol))
+        server = Server(protocol_class=GridEyeProtocol)
+        server.run()
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
