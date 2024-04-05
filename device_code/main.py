@@ -1,11 +1,8 @@
 import machine
 import utime 
 
-# import uasyncio 
-
-from amg88xx import AMG88XX, _PIXEL_TEMP_CONVERSION
+from amg88xx import AMG88XX
 from ClientNethandler import NetHandler
-# from debug import FerbCLI
 
 # Constants for network and server configuration
 HOST_SSID = 'Ferbius'
@@ -19,14 +16,13 @@ SCL_PIN = 17
 
 btn = machine.Pin(22, machine.Pin.IN)  # Push Button - Active LOW
 led = machine.Pin(18, machine.Pin.OUT) # We don't use the Pico's in-built LED
-speaker = machine.Pin(7, machine.Pin.OUT) 
+# speaker = machine.PWM(machine.Pin(7))
 i2c = machine.I2C(0, sda=SDA_PIN, scl=SCL_PIN, freq=400000)
 
 
 # Create the NetHandler and Grid-EYE classes
 net = NetHandler()
 sensor = AMG88XX(i2c)
-
 
 # we don't need a dedicated ADC class because it's so simple
 adc_addr = 0x6e
@@ -42,16 +38,16 @@ def blink() -> None:
     led.off()
 
 
-def blink_with_beep() -> None:
-    """
-    Blink the LED. With a beep!
-    """
-    led.off()
-    led.on()
-    speaker.on()
-    utime.sleep_ms(150)
-    led.off()
-    speaker.off()
+# def blink_with_beep() -> None:
+#     """
+#     Blink the LED. With a beep!
+#     """
+#     led.off()
+#     led.on()
+#     # speaker.on()
+#     utime.sleep_ms(150)
+#     led.off()
+#     # speaker.off()
 
 
 def read_adc() -> int:
@@ -89,21 +85,10 @@ def calibrate():
         utime.sleep_ms(200)
 
         counter += 1
-        print(f"Calibration step {1}")
+        print(f"Calibration step {counter}")
 
     print("Cal finished")
     utime.sleep(3)
-
-
-# def FERB_debug():
-#     """
-#     DEPRECATED - Boot FERB in Debug Mode
-#     """
-#     print("FERB booting in Debug mode...\n")
-#     cli = FerbCLI(sensor=sensor, nethandler=net)
-#     while True:
-#         if not cli.handle_input():
-#             break    
 
 
 def on_boot():
@@ -129,12 +114,13 @@ def on_boot():
     try:
         net.connect_to_socket(SERVER_IP, SERVER_PORT)
         print(f"Socket connection successful\n")
-    except Exception as e:
-        print(f"Damn. {e}")
-        return False
-  
-    calibrate()
 
+        calibrate()
+
+    except Exception as e:
+        print(f"Damn.")
+        panic(e)
+  
     return True
 
 
@@ -166,21 +152,28 @@ def FERB_main():
 
         # Spaz out if something bad happens
         except Exception as e:
-            print(f"Error: {e}")
-            blink()
-            utime.sleep_ms(200)
-            blink()
-            utime.sleep_ms(200)
-            blink()
-            utime.sleep_ms(600)
+            panic(e)
 
         except KeyboardInterrupt as k:
             net.disconnect_socket()
             utime.sleep_ms(200)
+
+            led.off()
             
             print("Ok, bye")
 
             break
+
+
+def panic(e):
+    while True:
+        print(f"Error: {e}")
+        blink()
+        utime.sleep_ms(200)
+        blink()
+        utime.sleep_ms(200)
+        blink()
+        utime.sleep_ms(600)
 
 
 if __name__ == "__main__":
