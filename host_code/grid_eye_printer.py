@@ -1,9 +1,14 @@
+import threading
+import queue
 import numpy as np
 
 from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
 
 
 _GRID_LEN = 8
+
+data_queue = queue.Queue()
+lock = threading.Lock()  # Create a lock
 
 
 class GridEyeProtocol(FerbProtocol):
@@ -37,19 +42,39 @@ class GridEyeProtocol(FerbProtocol):
         data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
 
         # Reshape the array to form an 8x8 matrix
-        temp_array = data_array.reshape((8, 8))
+        temperature_matrix = data_array.reshape((8, 8))
         if self._cal:
-            self.calibrate(temp_array)
+            self.calibrate(temperature_matrix )
             return
-       
-        print(temp_array)
-        print("\n-----------------------------------------\n")
+
+        difference_matrix = temperature_matrix - self.background
+        with lock:
+            data_queue.put((self.client_id,difference_matrix))
+
+
+class GridEyePrinter:
+    def __init__(self):
+        pass
+
+    def run(self, _queue: queue.Queue):
+        while True:
+            if _queue.empty():
+                continue
+            try:
+                print(_queue.get(timeout=10))
+                print("\n-----------------------------------------\n")
+            except:
+                pass
 
 
 if __name__ == "__main__":
     try:
+
         server = Server(protocol_class=GridEyeProtocol)
-        server.run()
+        printer = GridEyePrinter()
+        
+        threading.Thread(target=server.run).start()
+        threading.Thread(target=printer.run, args=(data_queue,)).start()
         
     except KeyboardInterrupt as k:
         print("\nGoodbye cruel world\n")
