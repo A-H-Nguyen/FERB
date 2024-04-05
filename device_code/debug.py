@@ -1,3 +1,9 @@
+########################################
+####                                ####
+####     THIS FILE IS DEPRECATED    ####
+####                                ####
+########################################
+
 import time
 
 from amg88xx import AMG88XX
@@ -63,8 +69,7 @@ class FerbCLI:
                 _ssid = input("SSID: ")
                 _passwd = input("Password: ")
 
-                if self.nethandler.connect_to_wifi(max_attempts=5,
-                                                   ssid=_ssid, password=_passwd):
+                if self.nethandler.connect_to_wifi(ssid=_ssid, password=_passwd):
                     print(f"Successfully connected to  {_ssid}")
                 else:
                     print(f"Could not connect to {_ssid}")

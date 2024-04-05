@@ -1,82 +1,190 @@
 import machine
-import time
+import utime 
+
+# import uasyncio 
 
 from amg88xx import AMG88XX, _PIXEL_TEMP_CONVERSION
 from ClientNethandler import NetHandler
-from debug import FerbCLI
+# from debug import FerbCLI
 
 # Constants for network and server configuration
 HOST_SSID = 'Ferbius'
 HOST_PASS = 'ajetaFERB'
-SERVER_IP = '10.42.0.1'  # IP address of the server, obtained from ifconfig output
-SERVER_PORT = 11111     # Arbitrary port number for the server, ensure it's known and available
+SERVER_IP = '10.42.0.1'  
+SERVER_PORT = 11111     
 
-# Constants for Grid-EYE configuration
 SDA_PIN = 16
 SCL_PIN = 17
 
-debug_pin = machine.Pin(22, machine.Pin.IN)
-led = machine.Pin("LED", machine.Pin.OUT)
 
+btn = machine.Pin(22, machine.Pin.IN)  # Push Button - Active LOW
+led = machine.Pin(18, machine.Pin.OUT) # We don't use the Pico's in-built LED
+speaker = machine.Pin(7, machine.Pin.OUT) 
+i2c = machine.I2C(0, sda=SDA_PIN, scl=SCL_PIN, freq=400000)
+
+
+# Create the NetHandler and Grid-EYE classes
 net = NetHandler()
-sensor = AMG88XX(machine.I2C(0, sda=SDA_PIN, scl=SCL_PIN, freq=400000))
+sensor = AMG88XX(i2c)
 
 
-def FERB_debug():
-    print("FERB booting in Debug mode...\n")
-    cli = FerbCLI(sensor=sensor, nethandler=net)
-    while True:
-        if not cli.handle_input():
-            break    
+# we don't need a dedicated ADC class because it's so simple
+adc_addr = 0x6e
 
 
-def FERB_main():
+def blink() -> None:
+    """
+    Blink the LED once
+    """
+    led.off()
+    led.on()
+    utime.sleep_ms(150)
+    led.off()
+
+
+def blink_with_beep() -> None:
+    """
+    Blink the LED. With a beep!
+    """
+    led.off()
+    led.on()
+    speaker.on()
+    utime.sleep_ms(150)
+    led.off()
+    speaker.off()
+
+
+def read_adc() -> int:
+    """
+    Get the raw ADC reading. We don't care about the actual voltage
+    """
+    i2c.writeto(adc_addr, b'\x00')
+    adc_data = i2c.readfrom(adc_addr, 2)
+
+    return (adc_data[0] & 0x0F) * 256 + adc_data[1]
+
+
+def send_data():
+    """
+    Send the Grid-EYE data to the server
+    """
+    sensor.refresh() # Read Grid-EYE data
+    utime.sleep_ms(100)
+    net.send_to_socket(sensor.get_buf())
+    utime.sleep_ms(100)
+
+
+def calibrate():
+    """
+    Start the FERB calibration sequence
+    """
+    net.send_to_socket(bytearray("~", "utf-8"))
+    led.on()
+    utime.sleep(8)
+
+    counter = 0
+    while counter < 5:
+        send_data()
+        blink()
+        utime.sleep_ms(200)
+
+        counter += 1
+        print(f"Calibration step {1}")
+
+    print("Cal finished")
+    utime.sleep(3)
+
+
+# def FERB_debug():
+#     """
+#     DEPRECATED - Boot FERB in Debug Mode
+#     """
+#     print("FERB booting in Debug mode...\n")
+#     cli = FerbCLI(sensor=sensor, nethandler=net)
+#     while True:
+#         if not cli.handle_input():
+#             break    
+
+
+def on_boot():
+    """
+    Boot sequence for the FERB Device.
+    
+    Connects to the local network and the TCP server on the FERB-deck.
+
+    Returns:
+        bool: True if all connections are successful, False otherwise.
+    """
+    blink()
     if not net.is_wifi_connected():
         print(f"Attempting to connect to {HOST_SSID} ...")
-        # if not net.connect_to_wifi(10, HOST_SSID, HOST_PASS):
-        #     raise Exception(f"Could not connect to wi-fi on {HOST_SSID}")
-        net.connect_to_wifi(5, HOST_SSID, HOST_PASS)
+        while not net.is_wifi_connected():
+            net.connect_to_wifi(HOST_SSID, HOST_PASS)
+            utime.sleep(5)
+            blink()
+
     print(f"Successfully connected to {net.get_ssid()}\n")
     print(f"Attempting to connect to socket {SERVER_IP}:{SERVER_PORT} ...")
     
-    net.connect_to_socket(SERVER_IP, SERVER_PORT)
-    
-    print(f"Socket connection successful\n")
+    try:
+        net.connect_to_socket(SERVER_IP, SERVER_PORT)
+        print(f"Socket connection successful\n")
+    except Exception as e:
+        print(f"Damn. {e}")
+        return False
   
-    net.send_to_socket(bytearray("~Calibrating", "utf-8"))
-    time.sleep_ms(1000)
+    calibrate()
 
+    return True
+
+
+def FERB_main():
+    """
+    Main program for the FERB device. 
+    
+    If the FERB is properly connected to the local network and server, it will 
+    wait for the ADC to output a high value. This high value means that the
+    microphone is detecting a fire alaram signal. When this occurs, the FERB
+    will begin continuously sending sensor data.
+    """
     while True:
         try:
-            sensor.refresh() # Grid-EYE read data
-            time.sleep_ms(100)
-            net.send_to_socket(sensor.get_buf())
-            time.sleep_ms(100)
+            if btn.value() == 0:
+                calibrate()
 
-        # Change this later -- we want it so that if something fucks up the FERB will try
-        # reconnecting to the wi-fi and then the socket server
+            reading = read_adc()
+            print(reading)
+            
+            # if reading < 9: 
+            #     net.send_to_socket(bytearray("!", "utf-8"))
+            #     blink()
+            #     utime.sleep(8)
+            #     continue
+
+            send_data()
+            blink()
+
+        # Spaz out if something bad happens
         except Exception as e:
             print(f"Error: {e}")
-            # time.sleep(2)
-            break
+            blink()
+            utime.sleep_ms(200)
+            blink()
+            utime.sleep_ms(200)
+            blink()
+            utime.sleep_ms(600)
 
         except KeyboardInterrupt as k:
             net.disconnect_socket()
-            time.sleep_ms(200)
+            utime.sleep_ms(200)
             
             print("Ok, bye")
 
-            led.off()
-            
             break
 
- 
+
 if __name__ == "__main__":
-    led.on()
-
-    if debug_pin.value() < 1:
-        FERB_debug()    
-    else:
+    i2c.writeto(adc_addr, b'\x10')
+    
+    if on_boot(): 
         FERB_main()
-
-    led.off()
