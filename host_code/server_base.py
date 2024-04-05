@@ -14,6 +14,7 @@ class FerbProtocol(asyncio.Protocol):
     def __init__(self):
         self.wait_timer = None
         self.TIME_LIMIT = 10
+        self._cal = False
 
     def connection_made(self, transport):
         self.transport = transport
@@ -30,13 +31,29 @@ class FerbProtocol(asyncio.Protocol):
             self.wait_timer.cancel()
 
     def data_received(self, data):
-        self.print_timestamp(f"Data received from {self.peername}")
-        
-        self.handle_data(data[:128])
+        try:
+            msg = data.decode()
+            
+            if msg[0] == '~':
+                self.prep_calibration()
+            elif msg[0] == '!':
+                self.print_timestamp(f"ACK Received - Connection good")
+            else:
+                self.print_timestamp(f"Data received from {self.peername}")
+                self.handle_data(data[:128])
+
+        except Exception as e:
+            self.print_timestamp(f"error: {e}")
         
         self.cancel_wait_timer()  # Cancel current wait timer
         self.start_wait_timer()  # Restart wait timer upon receiving data
 
+    def prep_calibration(self):
+        pass
+
+    def calibrate(self, data):
+        pass
+    
     def handle_data(self, data):
         pass
 
