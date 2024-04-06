@@ -33,10 +33,10 @@ much, MUCH easier.
 
 ```Bash
 # Create a virtual environment if one does not already exist in this directory
-python3 -m venv ferb_env
+python3 -m venv .venv
 
 # Activate the virtual environment
-source ferb_env/bin/activate
+source .venv/bin/activate
 
 # Install the required packages
 pip install -r requirements.txt

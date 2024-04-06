@@ -1,141 +1,188 @@
 import asyncio
+import tkinter as tk
 import numpy as np
+import datetime
+import sys
+import threading
+import queue  # For thread-safe communication between threads
 
-from graphics import *
-from server_base import FerbProtocol, Server, PIXEL_TEMP_CONVERSION
-from scipy.interpolate import RegularGridInterpolator
-
-# Number of pixels for both original Grid-EYE output, and interpolated output
-_GRID_LEN = 8
-_INTRP_LEN = 16
-
-THRESHOLD_TEMP = 24  # Define a threshold temperature value to consider as part of a blob
+from FERB_widgets import ScrollableFrame, ThermalCam
+from server_base import Server, FerbProtocol
+from tkinter import scrolledtext
+from tkinter import ttk
 
 
-class ThermalCam:
-    def __init__(self, resolution=400) -> None:
-        # Define the size of the thermal image grid
-        self._RESOLUTION = resolution
+_DEFAULT_IP = '10.42.0.1'
+_DEFAULT_PORT = 11111
 
-        self._black = color_rgb(0,0,0)
+# Width and Height of the Raspberry Pi screen
+SCREEN_WIDTH = 800  # self.winfo_screenwidth()
+SCREEN_HEIGHT = 400 # self.winfo_screenheight()
 
-        # Precompute the length of camera pixels for drawing
-        self._draw_dist = self._RESOLUTION / _INTRP_LEN
+# ID of the current FERB camera
 
-        # Create the Rectangle objects for thermal image once
-        self.rectangles = []
-        for row in range(_INTRP_LEN):
-            tmp_array = []
-            for col in range(_INTRP_LEN):
-                rect = Rectangle(Point(col * self._draw_dist, row * self._draw_dist), 
-                                 Point((col + 1) * self._draw_dist, (row + 1) * self._draw_dist))
-                rect.setFill(self._black)           
-                tmp_array.append(rect)
-            self.rectangles.append(tmp_array)
-
-        # Set the window with the given resolution
-        self.win = GraphWin("Thermal Image", self._RESOLUTION, self._RESOLUTION)
-
-    def draw_thermal_image(self, temps):
-        for row in range(_INTRP_LEN):
-            for col in range(_INTRP_LEN):
-                rect = self.rectangles[row][col]
-                rect.undraw()
-
-                if temps[row, col] >= THRESHOLD_TEMP:
-                    rect.draw(self.win)
+client_dict = {0:0}
+client_incoming_queue = queue.Queue()
+lock = threading.Lock()  # Create a lock
 
 
 class GridEyeProtocol(FerbProtocol):
-    def __init__(self):
-        self.wait_timer = None
-        self.TIME_LIMIT = 10
+    def __init__(self, gui):
+        super().__init__()
+        self.gui = gui
 
-        # Generate x and y coordinates for the original and interpolated Grid-EYE output
-        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
-        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
-        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
+    def prep_calibration(self):
+        print("Get the fuck out of the way!!!!")
 
-        self.cam = ThermalCam()
+    def calibrate(self, data):
+        print("Calibration finished.")
 
     def handle_data(self, data):
-        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
-        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+        try:
+            print(data.decode())
+        except:
+            print("Fuck")
 
-        if data_array.size != 64:
-            print("skipped")
-            return
-
-        # Reshape the array to form an 8x8 matrix
-        matrix = data_array.reshape((_GRID_LEN, _GRID_LEN))
-
-        # Create a scipy interpolation function for our temperature reading
-        interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), matrix)
-        interp_matrix = interp_func((self.interp_Y, self.interp_X))
-        norm_matrix = np.where(interp_matrix > THRESHOLD_TEMP, interp_matrix, 0)
-
-        # print("Temperature Matrix:")
-        # print(interp_matrix)
-        # print("\nDetected Blobs:")
-        # detected_blobs = self.blob_detection(matrix)
-        # detected_blobs = self.blob_detection(interp_matrix)
-        # for i, blob in enumerate(detected_blobs, start=1):
-        #     print(f"Blob {i}: {blob}")
-        # print("\n-----------------------------------------\n")
+    def connection_made(self, transport):
+        self.transport = transport
+        peername = transport.get_extra_info('peername')
+        self.client_id = peername[1]
         
-        # self.cam.draw_thermal_image(matrix)
-        self.cam.draw_thermal_image(norm_matrix)
+        print(f"Connection from {peername}\n")
 
-    def blob_detection(self, matrix):
-        """
-        Perform blob detection on the temperature matrix.
+        global curr_cam 
+        curr_cam = self.client_id 
 
-        Args:
-        - matrix (numpy.ndarray): An 8x8 matrix of temperature values.
+        self.gui.add_client(self.client_id)
 
-        Returns:
-        - List of tuples: Each tuple represents the coordinates (row, column) of the detected blobs.
-        """
+    def data_received(self, data):
+        try:
+            msg = data.decode()
+            if msg[0] == '~':
+                self.prep_calibration()
+            else:
+                global curr_cam
+                print(f"Received data from {self.client_id}")
+                if curr_cam == self.client_id:
+                    data_array = np.frombuffer(data, dtype=np.uint16) * 0.25
+                    temperatures = data_array.reshape((8,8))
+                    self.gui.draw_image(temperatures)
 
-        blobs = []
-        visited = set()
+                    hot_pixel = 0
+                    for i in range(8):
+                        for j in range(8):
+                            if temperatures[i,j] > hot_pixel:
+                                hot_pixel = temperatures[i,j]
+                    if hot_pixel >= 22:
+                        msg = "Person Detected"
+                    else:
+                        msg = "___"
 
-        # Define a function to perform depth-first search (DFS)
-        def dfs(row, col, blob):
-            if (row, col) in visited or row < 0 or col < 0 or row >= matrix.shape[0] or col >= matrix.shape[1]:
-                return
-            if matrix[row][col] < THRESHOLD_TEMP:
-                return
-            visited.add((row, col))
-            blob.append((row, col))
-            # Explore neighboring cells
-            dfs(row + 1, col, blob)
-            dfs(row - 1, col, blob)
-            dfs(row, col + 1, blob)
-            dfs(row, col - 1, blob)
-            # Diagonal exploration 
-            dfs(row - 1, col - 1, blob)
-            dfs(row - 1, col + 1, blob)
-            dfs(row + 1, col - 1, blob)
-            dfs(row + 1, col + 1, blob)
+                    self.gui.scrollable_frame.get_frame(self.client_id).update_status(msg)
 
-        # Iterate through each cell in the matrix
-        for i in range(matrix.shape[0]):
-            for j in range(matrix.shape[1]):
-                if matrix[i][j] >= THRESHOLD_TEMP and (i, j) not in visited:
-                    # Start a new blob
-                    blob = []
-                    dfs(i, j, blob)
-                    blobs.append(blob)
+        
+        except Exception as e:
+            self.print_timestamp(f"error: {e}")
+        
+        self.cancel_wait_timer()  # Cancel current wait timer
+        self.start_wait_timer()  # Restart wait timer upon receiving data
 
-        return blobs
+    def connection_lost(self, exc):
+        print(f"Connection with {self.client_id} closed\n")
+        self.gui.remove_client(self.client_id)
 
+
+class ClientFrame(tk.Frame):
+    def __init__(self, container, client_id, client_name:str, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+
+        self.id = client_id
+
+        self.client_name = tk.Label(self, text=client_name)
+        self.person_count_label = tk.Label(self, text="\nStatus:\n")
+        self.person_count_data = tk.Label(self, text="___")
+
+        self.display_btn = tk.Button(self, text="Display", command=self.dummy)
+
+        self.client_name.grid(row=0, column=0, sticky="ew")
+        self.person_count_label.grid(row=1, column=0, sticky="ew")
+        self.person_count_data.grid(row=3, column=0, sticky="ew")
+        self.display_btn.grid(row=0, column=1, columnspan=3, sticky="news")
+
+    def dummy(self):
+        global curr_cam
+        curr_cam = self.id
+
+    def update_status(self, msg:str):
+        self.person_count_data.config(text=msg)
+
+
+class ServerMonitor(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Asyncio Server Monitor")
+
+        self.clients = {0:0}
+        self.cam_id = 0 # ID of the client that is currently on camera
+
+        self.left_frame = tk.Frame(self, width=400, height=400)
+        self.right_frame = tk.Frame(self, width=400, height=400)
+        self.left_frame.grid(row=0, column=0)
+        self.right_frame.grid(row=0, column=1)
+        self.left_frame.grid_propagate(False)
+        self.right_frame.grid_propagate(False)
+        
+        self.scrollable_frame = ScrollableFrame(self.left_frame)
+        self.cam = ThermalCam(self.right_frame, width=400, height=400)
+        
+        self.scrollable_frame.grid(row=0,column=0)
+        self.cam.grid(row=0, column=0)
+    
+    def draw_image(self, data):
+        self.cam.draw_bw_image(data)
+
+    def add_client(self, client_id):
+        client_name = f"FERB{self.scrollable_frame.get_num_children()}"
+        frame = ClientFrame(self.scrollable_frame.scrollable_frame,
+                            callback=draw_me(),
+                            client_id=client_id, client_name=client_name,
+                            relief="sunken", borderwidth=1)
+        self.scrollable_frame.add_frame(frame)
+
+    def remove_client(self, client_id):
+        self.scrollable_frame.remove_frame_by_id(client_id)
+
+    def run(self):
+        self.mainloop()
+    
+
+
+def draw_me():
+    print("AAAAAA")
 
 if __name__ == "__main__":
-    try:
-        server = Server()
-        asyncio.run(server.start_server(GridEyeProtocol))
-        
-    except KeyboardInterrupt as k:
-        print("\nGoodbye cruel world\n")
+    # # Create FERB GUI App
+    # app = FERBApp()
+    app = ServerMonitor()
 
+    # # Overwrite system stdout
+    # # old_stdout = sys.stdout    
+    # # sys.stdout = Redirect(app.server_text)
+
+    # # Create echo server 
+    # # server = Server(protocol_class=EchoProtocol)
+    # # server = Server(lambda:GridEyeProtocol(app.canvas, SCREEN_HEIGHT))
+    # # server = Server(lambda:GridEyeProtocol('slkdf'))
+
+    # # Run GUI and server
+    # # threading.Thread(target=server.run).start()
+
+
+
+    # server = Server(GridEyeProtocol)
+    server = Server(lambda:GridEyeProtocol(app))
+    threading.Thread(target=server.run).start()
+
+
+    # app = CustomEventDemo()
+    app.mainloop()
