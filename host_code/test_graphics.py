@@ -20,6 +20,9 @@ _DEFAULT_PORT = 11111
 SCREEN_WIDTH = 800  # self.winfo_screenwidth()
 SCREEN_HEIGHT = 400 # self.winfo_screenheight()
 
+# ID of the current FERB camera
+curr_cam = 0
+
 client_dict = {0:0}
 client_incoming_queue = queue.Queue()
 lock = threading.Lock()  # Create a lock
@@ -48,9 +51,10 @@ class GridEyeProtocol(FerbProtocol):
         self.client_id = peername[1]
         
         print(f"Connection from {peername}\n")
-        # client_incoming_queue.put(self.client_id)
 
-        # self.gui.clients[self.client_id] = 0
+        global curr_cam 
+        curr_cam = self.client_id 
+
         self.gui.add_client(self.client_id)
 
     def data_received(self, data):
@@ -59,10 +63,13 @@ class GridEyeProtocol(FerbProtocol):
             if msg[0] == '~':
                 self.prep_calibration()
             else:
-                print(f"Received data from {self.client_id}\n")
-                data_array = np.frombuffer(data, dtype=np.uint16)
-
-                # client_dict[self.client_id] = data_array[0]
+                global curr_cam
+                print(f"Received data from {self.client_id}")
+                if curr_cam == self.client_id:
+                    data_array = np.frombuffer(data, dtype=np.uint16) * 0.25
+                    temperatures = data_array.reshape((8,8))
+                    print(temperatures)
+                    self.gui.draw_image(temperatures)
         
         except Exception as e:
             self.print_timestamp(f"error: {e}")
@@ -75,26 +82,26 @@ class GridEyeProtocol(FerbProtocol):
         self.gui.remove_client(self.client_id)
 
 
-# Redirect text outputs from the terminal
-class Redirect():
-    def __init__(self, widget, autoscroll=True):
-        self.widget = widget
-        self.autoscroll = autoscroll
-
-    def write(self, text):
-        self.widget.insert('end', text)
-        if self.autoscroll:
-            self.widget.see("end")  # autoscroll
-
-    def flush(self):
-       pass
-
-
-class CamFrame(tk.Canvas):
-    def __init__(self, container, *args, **kwargs):
+class ClientFrame(tk.Frame):
+    def __init__(self, container, client_id, client_name:str, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
-        self.label = tk.Label(self, text="Hey")
-        self.label.grid(row=0, column=0, sticky="ew")
+
+        self.id = client_id
+
+        self.client_name = tk.Label(self, text=client_name)
+        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
+        self.person_count_data = tk.Label(self, text="PLACEHOLDER")
+
+        self.display_btn = tk.Button(self, text="Display", command=self.dummy)
+
+        self.client_name.grid(row=0, column=0, sticky="ew")
+        self.person_count_label.grid(row=1, column=0, sticky="ew")
+        self.person_count_data.grid(row=3, column=0, sticky="ew")
+        self.display_btn.grid(row=0, column=1, columnspan=3, sticky="news")
+
+    def dummy(self):
+        global curr_cam
+        curr_cam = self.id
 
 
 class ServerMonitor(tk.Tk):
@@ -103,18 +110,30 @@ class ServerMonitor(tk.Tk):
         self.title("Asyncio Server Monitor")
 
         self.clients = {0:0}
+        self.cam_id = 0 # ID of the client that is currently on camera
 
-        self.cam_fram = CamFrame(self)
-        self.cam_fram.grid(row=1, column=1)
-
-        self.scrollable_frame = ScrollableFrame(self)
-        self.scrollable_frame.grid(row=1,column=0)
+        self.left_frame = tk.Frame(self, width=400, height=400)
+        self.right_frame = tk.Frame(self, width=400, height=400)
+        self.left_frame.grid(row=0, column=0)
+        self.right_frame.grid(row=0, column=1)
+        self.left_frame.grid_propagate(False)
+        self.right_frame.grid_propagate(False)
+        
+        self.scrollable_frame = ScrollableFrame(self.left_frame)
+        self.cam = ThermalCam(self.right_frame, width=400, height=400)
+        
+        self.scrollable_frame.grid(row=0,column=0)
+        self.cam.grid(row=0, column=0)
     
+    def draw_image(self, data):
+        self.cam.draw_bw_image(data)
+
     def add_client(self, client_id):
         client_name = f"FERB{self.scrollable_frame.get_num_children()}"
         frame = ClientFrame(self.scrollable_frame.scrollable_frame,
-                                client_id=client_id, client_name=client_name,
-                                relief="sunken", borderwidth=1)
+                            callback=draw_me(),
+                            client_id=client_id, client_name=client_name,
+                            relief="sunken", borderwidth=1)
         self.scrollable_frame.add_frame(frame)
 
     def remove_client(self, client_id):
@@ -124,21 +143,9 @@ class ServerMonitor(tk.Tk):
         self.mainloop()
     
 
-class ClientWatcher:
-    def __init__(self):
-        pass
 
-    def get_client(self, clients: queue.Queue):
-        while True:
-            if clients.empty():
-                continue
-            try:
-                with lock:
-                    print(clients.get(timeout=10))
-                    print("\n-----------------------------------------\n")
-            except:
-                continue
-
+def draw_me():
+    print("AAAAAA")
 
 if __name__ == "__main__":
     # # Create FERB GUI App

@@ -48,20 +48,24 @@ class ScrollableFrame(tk.Frame):
 
 
 class ClientFrame(tk.Frame):
-    def __init__(self, container, client_id, client_name:str, btn_cmd = None, *args, **kwargs):
+    def __init__(self, container, client_id, client_name:str, callback=None, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
 
         self.id = client_id
 
         self.client_name = tk.Label(self, text=client_name)
-        self.person_count = tk.Label(self, text="Placeholder")
+        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
+        self.person_count_data = tk.Label(self, text="PLACEHOLDER")
 
-        if not btn_cmd:
+        if not callback:
             self.display_btn = tk.Button(self, text="Display", command=self.dummy)
+        else:
+            self.display_btn = tk.Button(self, text="Display", command=callback)
 
         self.client_name.grid(row=0, column=0, sticky="ew")
-        self.person_count.grid(row=1, column=0, sticky="ew")
-        self.display_btn.grid(row=0, column=1, columnspan=2, sticky="news")
+        self.person_count_label.grid(row=1, column=0, sticky="ew")
+        self.person_count_data.grid(row=3, column=0, sticky="ew")
+        self.display_btn.grid(row=0, column=1, columnspan=3, sticky="news")
 
     def dummy(self):
         pass
