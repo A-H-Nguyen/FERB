@@ -1,1 +1,0 @@
-message("Grid-EYE examples coming soon")

@@ -1,1 +1,0 @@
-message("src/ is where the main code for FERB will live")
