@@ -19,6 +19,7 @@ class FerbProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.transport = transport
         self.peername = transport.get_extra_info("peername")
+        self.client_id = self.peername[1]
         self.print_timestamp(f"Connection from {self.peername}")
 
         self.start_wait_timer()  # Start wait timer when connection is made

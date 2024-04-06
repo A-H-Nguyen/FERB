@@ -1,6 +1,13 @@
+import numpy as np
 import tkinter as tk
 
 from tkinter import ttk
+
+
+_GRID_LEN = 8
+# _GRAYSCALE = 255
+_THRESHOLD = 25
+
 
 class ScrollableFrame(tk.Frame):
     def __init__(self, container, *args, **kwargs):
@@ -47,25 +54,40 @@ class ScrollableFrame(tk.Frame):
         child.destroy()
 
 
-class ClientFrame(tk.Frame):
-    def __init__(self, container, client_id, client_name:str, callback=None, *args, **kwargs):
+class ThermalCam(tk.Canvas):
+    def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
+        self._draw_len = 50 # Hard code 50 pixels because I fucking give up
 
-        self.id = client_id
+        self.prev_image = np.zeros((_GRID_LEN, _GRID_LEN), dtype=bool)
+        self.curr_image = np.zeros((_GRID_LEN, _GRID_LEN), dtype=bool)
 
-        self.client_name = tk.Label(self, text=client_name)
-        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
-        self.person_count_data = tk.Label(self, text="PLACEHOLDER")
+    def draw_bw_image(self, temps):
+        """
+        Draw the thermal image in black and white. Only pixels over a certain
+        theshold are shown. If a pixel is hot enough, it appears as white.
+        """
+        # self.create_rectangle(0, 0, self.winfo_width(), self.winfo_height(), 
+                            #   fill="black", outline='')
+        print(self.prev_image)
+        for row in range(_GRID_LEN):
+            for col in range(_GRID_LEN):
+                
+                self.curr_image[row,col] = temps[row,col] >= _THRESHOLD
 
-        if not callback:
-            self.display_btn = tk.Button(self, text="Display", command=self.dummy)
-        else:
-            self.display_btn = tk.Button(self, text="Display", command=callback)
+                if self.curr_image[row,col] == self.prev_image[row,col]:
+                    continue
+                
+                self.prev_image[row,col] = self.curr_image[row,col]
 
-        self.client_name.grid(row=0, column=0, sticky="ew")
-        self.person_count_label.grid(row=1, column=0, sticky="ew")
-        self.person_count_data.grid(row=3, column=0, sticky="ew")
-        self.display_btn.grid(row=0, column=1, columnspan=3, sticky="news")
+                if not self.curr_image[row, col]:
+                    color = "black"
+                else:
+                    color = "white"
 
-    def dummy(self):
-        pass
+                x0 = col * self._draw_len
+                y0 = row * self._draw_len
+                x1 = x0 + self._draw_len
+                y1 = y0 + self._draw_len
+
+                self.create_rectangle(x0, y0, x1, y1, fill=color, outline='')

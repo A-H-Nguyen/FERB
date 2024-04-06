@@ -21,7 +21,6 @@ SCREEN_WIDTH = 800  # self.winfo_screenwidth()
 SCREEN_HEIGHT = 400 # self.winfo_screenheight()
 
 # ID of the current FERB camera
-curr_cam = 0
 
 client_dict = {0:0}
 client_incoming_queue = queue.Queue()

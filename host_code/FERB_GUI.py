@@ -1,16 +1,24 @@
 """
 Main file for the FERB GUI
 """
-import numpy as np
+# import numpy as np
 import tkinter as tk
-import threading
+# import threading
 import queue  
 
+from FERB_widgets import ScrollableFrame, ThermalCam
 from tkinter import ttk
 
+# Global variables are a stain on this cursed world. They are a sin.
+# A vile and profane proclamation. I can only imagine that my use of this
+# has cursed me, damned me to the deepest blackest pits of damnation where
+# I know I truly belong for my vast transgressions on all of existence
+curr_cam = 0
 
 class Redirect():
     """
+    DON'T FUCKING USE THIS STUPID SHIT.
+
     We use this to redirect text output from functions like `print` into
     the tkinter widget of our choosing
     """
@@ -27,23 +35,44 @@ class Redirect():
        pass
 
 
+class ClientFrame(tk.Frame):
+    """
+    I can't put this in `FERB_widgets.py` because of the stupid fucking global
+    variable. I fucking hate my life
+    """
+    def __init__(self, container, client_id, client_name:str, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+
+        self.id = client_id
+
+        self.client_name = tk.Label(self, text=client_name)
+        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
+        self.person_count_data = tk.Label(self, text="PLACEHOLDER")
+
+        self.display_btn = tk.Button(self, text="Display", command=self.dummy)
+
+        self.client_name.grid(row=0, column=0, sticky="ew")
+        self.person_count_label.grid(row=1, column=0, sticky="ew")
+        self.person_count_data.grid(row=3, column=0, sticky="ew")
+        self.display_btn.grid(row=0, column=1, columnspan=3, sticky="news")
+
+    def dummy(self):
+        global curr_cam
+        curr_cam = self.id
+
+
+
 class FERBApp(tk.Tk):
+    """
+    Main parent class for the FERB GUI. This is the worst thing I have ever
+    written in my life. I hate it so fucking much.
+    """
     def __init__(self):
         super().__init__()
 
         self.title('FERB GUI')
-        self.attributes('-fullscreen',True)
+        # self.attributes('-fullscreen',True)
         
-        self.bind("<<CustomEvent>>", self.handle_custom_event)
-
-        # Queue for thread-safe communication
-        self.event_queue = queue.Queue()
-
-        # Start a separate thread to monitor the event queue
-        self.event_thread = threading.Thread(target=self.event_listener)
-        self.event_thread.daemon = True  # Thread will terminate when main thread ends
-        self.event_thread.start()
-
         self.grid_columnconfigure(0, weight = 1)
         self.grid_columnconfigure(1, weight = 1)
         self.grid_columnconfigure(2, weight = 2)
@@ -57,49 +86,21 @@ class FERBApp(tk.Tk):
         self.left_frame.grid_propagate(False)
         self.right_frame.grid_propagate(False)
 
-        self.create_canvas()
-        self.create_terminal_log()
-        self.create_person_counter()
-        self.create_buttons()
+        self.create_cam()
+        self.create_server_monitor()
+        # self.create_person_counter()
+        self.create_quit_btn()
 
-    def event_listener(self):
-        while True:
-            # Block until an event is received
-            event = self.event_queue.get()
-
-            # Trigger the custom event
-            self.event_generate("<<CustomEvent>>", when="tail", data=event.data)
-
-    def handle_custom_event(self, event):
-        # self.counter.delete("1.0", "end")
-        # print(event.data)
-        try:
-            # self.counter.insert("1.0", str(event.data))
-            self.counter.config(text=str(event.data))
-        except:
-            # self.counter.insert("1.0", "Fuck.")
-            self.counter.config(text="Fuck" + str(np.random.randint(0,100)))
-
-    # def trigger_custom_event(self, data):
-    #     # Put an event into the queue to trigger the custom event
-    #     self.event_queue.put("trigger_event")
-    
-    def create_buttons(self):
-        # cam_button = tk.Button(self.left_frame, text="new colors", command=self.draw_thermal_image)
-        # cam_button.grid(row=1, column=0, sticky="ew")
-
-        # I'm not sure we even WANT a stupid quit button
+    def create_quit_btn(self):
+        """
+        Fucking leave.
+        """
         close_button = tk.Button(self.left_frame, text="Quit", command=self.destroy)
         close_button.grid(row=2, column=0, sticky="ew")
 
-    def create_terminal_log(self):
-        server_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
-        self.server_text = tk.Text(server_frame)
-        
-        server_frame.grid(row=0, column=0, sticky = "nesw")
-        self.server_text.grid(row=0, column=0, sticky="ns")
-
-        server_frame.grid_propagate(False)
+    def create_server_monitor(self):
+        self.server_monitor = ScrollableFrame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
+        self.server_monitor.grid(row=0, column=0, sticky = "nesw")
     
     def create_person_counter(self):
         counter_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
@@ -112,6 +113,19 @@ class FERBApp(tk.Tk):
 
         counter_frame.grid_propagate(False)
 
-    def create_canvas(self):
-        self.canvas = tk.Canvas(self.right_frame, width=400, height=400)
-        self.canvas.grid(row=0, column=1, rowspan=2, sticky="nesw")
+    def create_cam(self):
+        self.cam = ThermalCam(self.right_frame, width=400, height=400)
+        self.cam.grid(row=0, column=1, rowspan=2, sticky="nesw")
+
+    def add_client(self, client_id):
+        client_name = f"FERB{self.scrollable_frame.get_num_children()}"
+        frame = ClientFrame(self.scrollable_frame.scrollable_frame,
+                            client_id=client_id, client_name=client_name,
+                            relief="sunken", borderwidth=1)
+        self.scrollable_frame.add_frame(frame)
+
+    def remove_client(self, client_id):
+        self.scrollable_frame.remove_frame_by_id(client_id)
+
+    def draw_image(self, data):
+        self.cam.draw_bw_image(data)
