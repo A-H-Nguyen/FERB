@@ -7,13 +7,26 @@ import queue
 from FERB_GUI import FERBApp, Redirect
 from scipy.interpolate import RegularGridInterpolator
 from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
+# from thermal_cam import ThermalCam
 
+
+# Number of pixels for both original Grid-EYE output, and interpolated output
 _GRID_LEN = 8
 _INTRP_LEN = 16
 _GRAYSCALE = 255
+
+
+# Default values for range of temps post-background subtraction
 _MIN_VAL = 0
 _MAX_VAL = 5
+
+# Width and Height of the Raspberry Pi screen
+SCREEN_WIDTH = 800  
+SCREEN_HEIGHT = 400 
 GRID_EYE_HEIGHT = 52
+
+data_queue = queue.Queue()
+lock = threading.Lock()  # Create a lock
 
 class BlobDetector:
     def __init__(self):
@@ -73,8 +86,9 @@ class BlobDetector:
         pixel_occupancy_per_person = average_human_area / pixels
         return pixel_occupancy_per_person
 
-class GridEyeProtocol:
-    def __init__(self):
+class GridEyeProtocol(FerbProtocol):
+    def __init__(self, screen_len):
+        super().__init__()
         self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
         self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
         self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
@@ -83,21 +97,29 @@ class GridEyeProtocol:
         self.blob_detector = BlobDetector()
 
     def prep_calibration(self):
-        print("Calibrating sensor...")
+        self.print_timestamp(f"Calibrating sensor...")
+        print("Get the fuck out of the way!!!!")
+        
+        self._cal = True
         self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
-        self.cal_counter = 0
 
     def calibrate(self, data):
         self.background += data
         self.cal_counter += 1
+
         if self.cal_counter == 5:
             self.background /= self.cal_counter
+            
             self.cal_counter = 0
-            print("Calibration finished.")
+            self._cal = False
+          
+            self.print_timestamp("Calibration finished.")
 
     def handle_data(self, data):
-        data_array = np.frombuffer(data, dtype=np.uint16)
-        interp_func = RegularGridInterpolator((self.orig_coords, self.orig_coords), data_array.reshape((8, 8)))
+        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+        interp_func = RegularGridInterpolator((self.orig_coords,
+                                                self.orig_coords),
+                                               data_array.reshape((8, 8)))
         temperature_matrix = interp_func((self.interp_Y, self.interp_X))
 
         if self._cal:
@@ -124,5 +146,5 @@ class GridEyeProtocol:
         return int(((value - _MIN_VAL) / (_MAX_VAL - _MIN_VAL)) * _GRAYSCALE)
 
 if __name__ == "__main__":
-    protocol = GridEyeProtocol()
-    # Now you can use GridEyeProtocol and BlobDetector classes separately.
+    server = Server(lambda:GridEyeProtocol(SCREEN_HEIGHT))
+    server.run()
