@@ -15,38 +15,15 @@ from tkinter import ttk
 # I know I truly belong for my vast transgressions on all of existence
 curr_cam = 0
 
-class Redirect():
-    """
-    DON'T FUCKING USE THIS STUPID SHIT.
-
-    We use this to redirect text output from functions like `print` into
-    the tkinter widget of our choosing
-    """
-    def __init__(self, widget, autoscroll=True):
-        self.widget = widget
-        self.autoscroll = autoscroll
-
-    def write(self, text):
-        self.widget.insert('end', text)
-        if self.autoscroll:
-            self.widget.see("end")  # autoscroll
-
-    def flush(self):
-       pass
-
 
 class ClientFrame(tk.Frame):
-    """
-    I can't put this in `FERB_widgets.py` because of the stupid fucking global
-    variable. I fucking hate my life
-    """
     def __init__(self, container, client_id, client_name:str, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
 
         self.id = client_id
 
         self.client_name = tk.Label(self, text=client_name)
-        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
+        self.person_count_label = tk.Label(self, text="\nPerson Count:")
         self.person_count_data = tk.Label(self, text="PLACEHOLDER")
 
         self.display_btn = tk.Button(self, text="Display", command=self.dummy)
@@ -59,6 +36,9 @@ class ClientFrame(tk.Frame):
     def dummy(self):
         global curr_cam
         curr_cam = self.id
+
+    def update_status(self, msg:str):
+        self.person_count_data.config(text=msg)
 
 
 

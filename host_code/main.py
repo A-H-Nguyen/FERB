@@ -1,6 +1,7 @@
 import sys
 import threading
 import numpy as np
+import tkinter as tk
 
 from FERB_GUI import FERBApp, curr_cam # AAAAAAAAAAAAAAH FUCK YOU
 from scipy.interpolate import RegularGridInterpolator
@@ -68,6 +69,22 @@ class GridEyeProtocol(FerbProtocol):
         global curr_cam
         if curr_cam == self.client_id:
             self.app.draw_image(temperature_matrix)
+##########################################################
+        hot_pixel = 0
+        for i in range(8):
+            for j in range(8):
+                if temperature_matrix[i,j] > hot_pixel:
+                    hot_pixel = temperature_matrix[i,j]
+            if hot_pixel >= 22:
+                msg = "Person Detected"
+            else:
+                msg = "___"
+
+            self.gui.scrollable_frame.get_frame(self.client_id).update_status(msg)
+            
+
+###########################################################
+
             # print("NIce matrix bRO")
 
         # interp_func = RegularGridInterpolator((self.orig_coords, 
@@ -100,12 +117,19 @@ class GridEyeProtocol(FerbProtocol):
         super().connection_lost(exc)
         self.app.remove_client(self.client_id)
 
+
+
+#def draw_me():
+ #   print("AAAAAA")
+
+
 if __name__ == "__main__":
     # Create FERB GUI App
     app = FERBApp()
 
-    server = Server(lambda:GridEyeProtocol(app))
+    # server = Server(lambda:GridEyeProtocol(app))
 
     # Run GUI and server
-    threading.Thread(target=server.run).start()
+   # threading.Thread(target=server.run).start()
     app.mainloop()
+
