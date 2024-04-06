@@ -90,7 +90,7 @@ class GridEyeProtocol(FerbProtocol):
         IDK why, I thought it would be cool. I guess.
         """
         super().connection_made(transport)
-        self.gui.add_client(self.client_id)
+        self.app.add_client(self.client_id)
         
         global curr_cam 
         curr_cam = self.client_id 
@@ -98,7 +98,7 @@ class GridEyeProtocol(FerbProtocol):
 
     def connection_lost(self, exc):
         super().connection_lost(exc)
-        self.gui.remove_client(self.client_id)
+        self.app.remove_client(self.client_id)
 
 if __name__ == "__main__":
     # Create FERB GUI App

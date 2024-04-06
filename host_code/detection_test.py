@@ -98,6 +98,25 @@ class GridEyeProtocol(FerbProtocol):
 
         return blobs
 
+        # Calculated from R = 2 * x * tan(60 degrees / 2)
+        # R = area in meters squared
+        # x = height in meters 
+        # Below is coneverted to inches 
+        area = height * 45.4973
+
+        # About the size a person takes up in inches 
+        average_human_area = 80
+
+        # Taking the detection area, divide by amount of pixels to find pixel size 
+        grid_size = _INTRP_LEN * _INTRP_LEN
+        pixels = area / grid_size
+
+        # Take the area of the person and the area of a pixel and compare 
+        # Obtain the amount of pixels a person should take up 
+        pixel_occupancy_per_person = average_human_area / pixels
+
+        return pixel_occupancy_per_person
+
 
 if __name__ == "__main__":
     try:

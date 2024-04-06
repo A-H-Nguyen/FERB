@@ -6,7 +6,7 @@ from tkinter import ttk
 
 _GRID_LEN = 8
 # _GRAYSCALE = 255
-_THRESHOLD = 25
+_THRESHOLD = 22
 
 
 class ScrollableFrame(tk.Frame):

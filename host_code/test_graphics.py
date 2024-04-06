@@ -6,9 +6,8 @@ import sys
 import threading
 import queue  # For thread-safe communication between threads
 
-from FERB_widgets import ScrollableFrame, ClientFrame
+from FERB_widgets import ScrollableFrame, ThermalCam
 from server_base import Server, FerbProtocol
-from thermal_cam import ThermalCam
 from tkinter import scrolledtext
 from tkinter import ttk
 
@@ -67,8 +66,20 @@ class GridEyeProtocol(FerbProtocol):
                 if curr_cam == self.client_id:
                     data_array = np.frombuffer(data, dtype=np.uint16) * 0.25
                     temperatures = data_array.reshape((8,8))
-                    print(temperatures)
                     self.gui.draw_image(temperatures)
+
+                    hot_pixel = 0
+                    for i in range(8):
+                        for j in range(8):
+                            if temperatures[i,j] > hot_pixel:
+                                hot_pixel = temperatures[i,j]
+                    if hot_pixel >= 22:
+                        msg = "Person Detected"
+                    else:
+                        msg = "___"
+
+                    self.gui.scrollable_frame.get_frame(self.client_id).update_status(msg)
+
         
         except Exception as e:
             self.print_timestamp(f"error: {e}")
@@ -88,8 +99,8 @@ class ClientFrame(tk.Frame):
         self.id = client_id
 
         self.client_name = tk.Label(self, text=client_name)
-        self.person_count_label = tk.Label(self, text="\nPerson Count:\n")
-        self.person_count_data = tk.Label(self, text="PLACEHOLDER")
+        self.person_count_label = tk.Label(self, text="\nStatus:\n")
+        self.person_count_data = tk.Label(self, text="___")
 
         self.display_btn = tk.Button(self, text="Display", command=self.dummy)
 
@@ -101,6 +112,9 @@ class ClientFrame(tk.Frame):
     def dummy(self):
         global curr_cam
         curr_cam = self.id
+
+    def update_status(self, msg:str):
+        self.person_count_data.config(text=msg)
 
 
 class ServerMonitor(tk.Tk):

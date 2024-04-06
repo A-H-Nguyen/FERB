@@ -71,7 +71,7 @@ class FERBApp(tk.Tk):
         super().__init__()
 
         self.title('FERB GUI')
-        # self.attributes('-fullscreen',True)
+        self.attributes('-fullscreen',True)
         
         self.grid_columnconfigure(0, weight = 1)
         self.grid_columnconfigure(1, weight = 1)
@@ -118,14 +118,14 @@ class FERBApp(tk.Tk):
         self.cam.grid(row=0, column=1, rowspan=2, sticky="nesw")
 
     def add_client(self, client_id):
-        client_name = f"FERB{self.scrollable_frame.get_num_children()}"
-        frame = ClientFrame(self.scrollable_frame.scrollable_frame,
+        client_name = f"FERB{self.server_monitor.get_num_children()}"
+        frame = ClientFrame(self.server_monitor.scrollable_frame,
                             client_id=client_id, client_name=client_name,
                             relief="sunken", borderwidth=1)
-        self.scrollable_frame.add_frame(frame)
+        self.server_monitor.add_frame(frame)
 
     def remove_client(self, client_id):
-        self.scrollable_frame.remove_frame_by_id(client_id)
+        self.server_monitor.remove_frame_by_id(client_id)
 
     def draw_image(self, data):
         self.cam.draw_bw_image(data)

@@ -2,6 +2,7 @@ import sys
 import threading
 import numpy as np
 import asyncio
+import queue
 
 from FERB_GUI import FERBApp, Redirect
 from scipy.interpolate import RegularGridInterpolator
@@ -14,6 +15,7 @@ _GRID_LEN = 8
 _INTRP_LEN = 16
 _GRAYSCALE = 255
 
+
 # Default values for range of temps post-background subtraction
 _MIN_VAL = 0
 _MAX_VAL = 5
@@ -22,6 +24,9 @@ _MAX_VAL = 5
 SCREEN_WIDTH = 800  
 SCREEN_HEIGHT = 400 
 GRID_EYE_HEIGHT = 52
+
+data_queue = queue.Queue()
+lock = threading.Lock()  # Create a lock
 
 class GridEyeProtocol(FerbProtocol):
     def __init__(self, screen_len):
@@ -39,8 +44,7 @@ class GridEyeProtocol(FerbProtocol):
         self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
         
         # Variables for calibration sequence
-        self.cal_finished = True
-        self.cal_counter = 1
+        self.cal_counter = 0
 
     def blob_detection(self, matrix):
         """
@@ -105,7 +109,7 @@ class GridEyeProtocol(FerbProtocol):
                 elif pixel_count >= pixel_per_person * 3 and pixel_count < pixel_per_person * 4:
                     person_count = 3
 
-                elif pixel_count >= pixel_per_person * 3.5 and pixel_count < pixel_per_person * 4.5:
+                elif pixel_count >= pixel_per_person * 4 and pixel_count < pixel_per_person * 5:
                     person_count = 4
 
             # blob_data = {'coordinates': blob, 'person_count': person_count}
@@ -118,72 +122,124 @@ class GridEyeProtocol(FerbProtocol):
 
         return blobs
 
-    def calibrate(self, input_matrix) -> None:
-        self.background += input_matrix
+
+    def prep_calibration(self):
+        self.print_timestamp(f"Calibrating sensor...")
+        print("Get the fuck out of the way!!!!")
+        
+        self._cal = True
+        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+
+
+    def calibrate(self, data):
+        self.background += data
         self.cal_counter += 1
 
-        if self.cal_counter > 5:
-            self.background /= 5 # Hardcode this value instead
-                                 # I was using the counter for some fucking reason
-            self.cal_finished = True
+        if self.cal_counter == 5:
+            self.background /= self.cal_counter
+            
+            self.cal_counter = 0
+            self._cal = False
+          
             self.print_timestamp("Calibration finished.")
     
-    def handle_data(self, data):
-        try:
-            msg = data.decode()
-            if msg[0] == '~':
-                # start calibration sequence here
-                self.print_timestamp("Calibrating sensor. Get the fuck out of the way")
-                self.cal_finished = False
-                return
+    # def handle_data(self, data):
+    #     try:
+    #         msg = data.decode()
+    #         if msg[0] == '~':
+    #             # start calibration sequence here
+    #             self.print_timestamp("Calibrating sensor. Get the fuck out of the way")
+    #             self.cal_finished = False
+    #             return
 
-            # Convert the bytearray to a numpy array of 16-bit integers (short ints)
-            data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+    #         # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+    #         data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
 
-            if data_array.size != 64:
-                self.print_timestamp("Bad packet")
-                return
+    #         if data_array.size != 64:
+    #             self.print_timestamp("Bad packet")
+    #             return
 
-            # Convert the bytearray to a numpy array of 16-bit integers (short ints)
-            data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
-            interp_func = RegularGridInterpolator((self.orig_coords, 
-                                                   self.orig_coords), 
-                                                   data_array.reshape((8,8)))
-            temperatures = interp_func((self.interp_Y, self.interp_X))
+    #         # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+    #         data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+    #         interp_func = RegularGridInterpolator((self.orig_coords, 
+    #                                                self.orig_coords), 
+    #                                                data_array.reshape((8,8)))
+    #         temperatures = interp_func((self.interp_Y, self.interp_X))
             
-            if not self.cal_finished:
-                self.calibrate(temperatures)
-                return
+    #         if not self.cal_finished:
+    #             self.calibrate(temperatures)
+    #             return
             
-            diff_matrix = np.clip(temperatures - self.background, _MIN_VAL, _MAX_VAL)
+    #         diff_matrix = np.clip(temperatures - self.background, _MIN_VAL, _MAX_VAL)
             
-            for i in range(_INTRP_LEN):
-                for j in range(_INTRP_LEN):
-                    diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
+    #         for i in range(_INTRP_LEN):
+    #             for j in range(_INTRP_LEN):
+    #                 diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
 
-            # self.cam.draw_thermal_image(diff_matrix)
+    #         # self.cam.draw_thermal_image(diff_matrix)
 
-            # self.trigger_custom_event(np.random.randint(0,100))
+    #         # self.trigger_custom_event(np.random.randint(0,100))
 
-            print("Temperature Matrix:")
-            
-            for row in diff_matrix:
-                print('[', end='')
-                print(' '.join(map(str, row[:16])), end='')
-                print(']')
+    #         print("Temperature Matrix:")
+    #         # Print the matrix row by row
+    #         for row in diff_matrix:
+    #             print(' '.join(map(str, row)))  # Join elements of the row with spaces and print
 
-            print("\nDetected Blobs:")
-            detected_blobs = self.blob_detection(diff_matrix)
-            for i, blob in enumerate(detected_blobs, start=1):
-                print(f"Blob {i}: {blob}")
-            print("\n-----------------------------------------\n")
+    #         print("\nDetected Blobs:")
+    #         detected_blobs = self.blob_detection(diff_matrix)
+    #         for i, blob in enumerate(detected_blobs, start=1):
+    #             print(f"Blob {i}: {blob}")
+    #         print("\n-----------------------------------------\n")
         
-        except Exception as e:
-            print(f"error: {e}")
+    #     except Exception as e:
+    #         print(f"error: {e}")
     
     # def trigger_custom_event(self, data):
     #     # Trigger the custom event
     #     self.app.event_generate("<<CustomEvent>>", when="tail", data=data)
+
+    def handle_data(self, data):
+
+        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+        # Reshape the array to form an 8x8 matrix
+        # temperature_matrix = 
+        
+        interp_func = RegularGridInterpolator((self.orig_coords, 
+                                                self.orig_coords), 
+                                                data_array.reshape((8, 8)))
+        temperature_matrix = interp_func((self.interp_Y, self.interp_X))
+
+        if self._cal:
+            self.calibrate(temperature_matrix )
+            return
+
+        # Convert the bytearray to a numpy array of 16-bit integers (short ints)
+        # data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+
+                
+        diff_matrix = np.clip(temperature_matrix - self.background, _MIN_VAL, _MAX_VAL)
+        
+        for i in range(_INTRP_LEN):
+            for j in range(_INTRP_LEN):
+                diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
+
+        # self.cam.draw_thermal_image(diff_matrix)
+
+        # self.trigger_custom_event(np.random.randint(0,100))
+
+        print("Temperature Matrix:")
+        # Print the matrix row by row
+        for row in diff_matrix:
+            print(' '.join(map(str, row)))  # Join elements of the row with spaces and print
+
+        print("\nDetected Blobs:")
+        detected_blobs = self.blob_detection(diff_matrix)
+        for i, blob in enumerate(detected_blobs, start=1):
+            print(f"Blob {i}: {blob}")
+        print("\n-----------------------------------------\n")
+
     
     def convert_to_grayscale(self, value) -> int:
         return int(((value - _MIN_VAL) / (_MAX_VAL - _MIN_VAL)) * _GRAYSCALE)
