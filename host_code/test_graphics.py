@@ -1,7 +1,3 @@
-#####################################
-###  Testing how to use tkinter   ###
-#####################################
-
 import asyncio
 import tkinter as tk
 import numpy as np
@@ -11,7 +7,6 @@ import threading
 import queue  # For thread-safe communication between threads
 
 from server_base import Server, FerbProtocol
-from grid_eye_printer import GridEyeProtocol
 from thermal_cam import ThermalCam
 from tkinter import scrolledtext
 from tkinter import ttk
@@ -24,15 +19,16 @@ _DEFAULT_PORT = 11111
 SCREEN_WIDTH = 800  # self.winfo_screenwidth()
 SCREEN_HEIGHT = 400 # self.winfo_screenheight()
 
-data_queue = queue.Queue()
-client_list = queue.Queue()
+client_dict = {0:0}
+client_incoming_queue = queue.Queue()
 lock = threading.Lock()  # Create a lock
 
 
 class GridEyeProtocol(FerbProtocol):
-    def start_wait_timer(self):
-        pass
-    
+    def __init__(self, gui):
+        super().__init__()
+        self.gui = gui
+
     def prep_calibration(self):
         print("Get the fuck out of the way!!!!")
 
@@ -46,17 +42,36 @@ class GridEyeProtocol(FerbProtocol):
             print("Fuck")
 
     def connection_made(self, transport):
-        # self.transport = transport
+        self.transport = transport
         peername = transport.get_extra_info('peername')
+        self.client_id = peername[1]
+        
         print(f"Connection from {peername}\n")
-        client_list.put(peername)
+        # client_incoming_queue.put(self.client_id)
+
+        # self.gui.clients[self.client_id] = 0
+        self.gui.add_client(self.client_id)
 
     def data_received(self, data):
-        message = data.decode()
-        print(f"Received: {message}\n")
+        try:
+            msg = data.decode()
+            if msg[0] == '~':
+                self.prep_calibration()
+            else:
+                print(f"Received data from {self.client_id}\n")
+                data_array = np.frombuffer(data, dtype=np.uint16)
+
+                # client_dict[self.client_id] = data_array[0]
+        
+        except Exception as e:
+            self.print_timestamp(f"error: {e}")
+        
+        self.cancel_wait_timer()  # Cancel current wait timer
+        self.start_wait_timer()  # Restart wait timer upon receiving data
 
     def connection_lost(self, exc):
-        print("Connection closed\n")
+        print(f"Connection with {self.client_id} closed\n")
+        self.gui.remove_client(self.client_id)
 
 
 # Redirect text outputs from the terminal
@@ -98,48 +113,81 @@ class ScrollableFrame(tk.Frame):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+    def get_num_children(self) -> int:
+        return len(self.scrollable_frame.grid_slaves())
+    
+    def add_frame(self, frame):
+        frame_num = self.get_num_children() + 1
+        frame.grid(row= frame_num, column=0, sticky="ew")
+
+        print(f"Added frame number {frame_num}")
+
+    def remove_frame_by_id(self, frame_id):
+        children = self.scrollable_frame.winfo_children()
+        for child in children:
+            if hasattr(child, 'id') and child.id == frame_id:
+                child.pack_forget()
+                child.destroy()
+                break
+
 
 class FERBClientFrame(tk.Frame):
-    def __init__(self, master, client_id, client_name, *args, **kwargs):
-        super().__init__(master, *args, **kwargs)
+    def __init__(self, container, client_id, client_name:str, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
 
-        self._id = client_id
-        self.label = tk.Label(self, text=str(client_name))
-        self.label.grid(row=0, column=0)
+        self.id = client_id
+        self.client_name = tk.Label(self, text=client_name)
+        self.data = tk.Label(self, text="Placeholder")
+
+        self.client_name.grid(row=0, column=0, sticky="ew")
+        self.data.grid(row=1, column=0, sticky="ew")
+
+
+class CamFrame(tk.Canvas):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.label = tk.Label(self, text="Hey")
+        self.label.grid(row=0, column=0, sticky="ew")
 
 class ServerMonitor(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Asyncio Server Monitor")
 
-        self.label = tk.Label(self, text=f"Server running on {_DEFAULT_IP}:{_DEFAULT_PORT}")
-        self.label.pack()
-        # self.label.grid(row=0, column=0, columnspan=2)
+        # self.label = tk.Label(self, text=f"Server running on {_DEFAULT_IP}:{_DEFAULT_PORT}")
+        # self.label.pack()
+        # self.label.grid(row=0, column=0)
 
-        self.scrollable_frame = ScrollableFrame(self)
-        self.scrollable_frame.pack(expand=True, fill="both")
+        self.clients = {0:0}
 
-        # self.client_list_label = tk.Label(self, text="Connected Clients:")
-        # self.client_list_label.grid(row=0, column=0)
+        self.create_scrollable_gui()
+        self.cam_fram = CamFrame(self)
+        self.cam_fram.grid(row=1, column=1)
 
-        # self.client_list = scrolledtext.ScrolledText(self, width=40, height=10)
-        # self.client_list.grid(row=0, column=1)
+        # self.client_incoming_queue_label = tk.Label(self, text="Connected Clients:")
+        # self.client_incoming_queue_label.grid(row=0, column=0)
+
+        # self.client_incoming_queue = scrolledtext.ScrolledText(self, width=40, height=10)
+        # self.client_incoming_queue.grid(row=0, column=1)
 
         # # await self.start_server()
         # # self.server = Server(lambda:GridEyeProtocool(self))
         # # threading.Thread(target=self.server.run).start()
-        # threading.Thread(target=self.watch_clients, args=(client_list,)).start()
+        
+        # threading.Thread(target=self.watch_clients, args=(client_incoming_queue,)).start()
 
     def create_scrollable_gui(self):
-        for i in range(20):
-            frame = tk.Frame(self.scrollable_frame.scrollable_frame, relief="sunken", borderwidth=1)
-            frame.configure(width=100, height=50)
-            frame.grid_propagate(False)  # Prevents the frame from resizing to fit its contents
-
-            label = tk.Label(frame, text=f"Frame {i}")
-            label.pack(expand=True, fill="both")
-
-            self.scrollable_frame.add_frame(frame)
+        self.scrollable_frame = ScrollableFrame(self)
+        self.scrollable_frame.grid(row=1,column=0)
+        # for i in range(20):
+        #     frame = FERBClientFrame(self.scrollable_frame.scrollable_frame, 
+        #                             client_id=i, client_name=f"FERB{i}",
+        #                              relief="sunken", borderwidth=1)
+        #     frame.configure(width=100, height=50)
+        #     frame.grid_propagate(False)  # Prevents the frame from resizing to fit its contents
+        #     label = tk.Label(frame, text=f"Frame {i}")
+        #     label.pack(expand=True, fill="both")
+            # self.scrollable_frame.add_frame(frame)
 
     # async def start_server(self):
     #     # Get the current event loop
@@ -153,28 +201,35 @@ class ServerMonitor(tk.Tk):
     #     async with self.server:
     #         await self.server.serve_forever()
 
-    def update_clients(self, message):
-        self.client_list.insert(tk.END, message)
-        self.client_list.see(tk.END)
+    def add_client(self, client_id):
+        # self.client_incoming_queue.insert(tk.END, message)
+        # self.client_incoming_queue.see(tk.END)
+        client_name = f"FERB{self.scrollable_frame.get_num_children()}"
+        frame = FERBClientFrame(self.scrollable_frame.scrollable_frame,
+                                client_id=client_id, client_name=client_name,
+                                relief="sunken", borderwidth=1)
+        self.scrollable_frame.add_frame(frame)
+
+    def remove_client(self, client_id):
+        self.scrollable_frame.remove_frame_by_id(client_id)
 
     def run(self):
         self.mainloop()
     
-    def watch_clients(self, clients: queue.Queue):
-        while True:
-            if clients.empty():
-                continue
-            try:
-                with lock:
-                    new_client = clients.get(timeout=10)
+    # def watch_clients(self, clients: queue.Queue):
+    #     print("The watcher has arrived")
+    #     while True:
+    #         if clients.empty():
+    #             continue
+    #         try:
+    #             with lock:
+    #                 print("New client detected")
+    #                 new_client = clients.get(timeout=10)
+    #                 self.add_client(new_client)
 
-                    print(new_client)
-                    print("\n-----------------------------------------\n")
-
-                    self.update_clients(new_client)
-            except:
-                print("Something bad happened")
-                continue
+    #         except Exception as e:
+    #             print(f"Error: {e}")
+    #             continue
 
 
 
@@ -194,105 +249,12 @@ class ClientWatcher:
                 continue
 
 
-class FERBApp(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title('FERB GUI')
-        self.attributes('-fullscreen',True)
-
-        self.bind("<<CustomEvent>>", self.handle_custom_event)
-
-        # Queue for thread-safe communication
-        self.event_queue = queue.Queue()
-
-        # Start a separate thread to monitor the event queue
-        self.event_thread = threading.Thread(target=self.event_listener)
-        self.event_thread.daemon = True  # Thread will terminate when main thread ends
-        self.event_thread.start()
-
-        self.grid_columnconfigure(0, weight = 1)
-        self.grid_columnconfigure(1, weight = 1)
-        self.grid_columnconfigure(2, weight = 2)
-        self.grid_rowconfigure(0, weight = 2)
-        self.grid_rowconfigure(1, weight = 2)
-        self.grid_rowconfigure(2, weight = 1)
-        
-        self.left_frame = tk.Frame(self, width=400, height=400)
-        self.right_frame = tk.Frame(self, width=400, height=400)
-
-        self.left_frame.grid(row=0, column=0)
-        self.right_frame.grid(row=0, column=1)
-
-        self.left_frame.grid_propagate(False)
-        # self.right_frame.grid_propagate(False)
-
-        self.create_canvas()
-        self.create_terminal_log()
-        self.create_person_counter()
-        self.create_buttons()
-
-        self.cam = ThermalCam(self.canvas, SCREEN_HEIGHT)
-        self.cam.draw_thermal_image(np.random.randint(0, 6, size=(16, 16)))
-
-    def event_listener(self):
-        while True:
-            # Block until an event is received
-            event = self.event_queue.get()
-
-            # Trigger the custom event
-            self.event_generate("<<CustomEvent>>", when="tail")
-
-    def handle_custom_event(self, event):
-        self.cam.draw_thermal_image(np.random.randint(0, 6, size=(16, 16)))
-
-    def trigger_custom_event(self):
-        # Put an event into the queue to trigger the custom event
-        self.event_queue.put("trigger_event")
-    
-    def create_buttons(self):
-        # cam_button = tk.Button(self.left_frame, text="new colors", command=self.draw_thermal_image)
-        # cam_button.grid(row=1, column=0, sticky="ew")
-
-        # I'm not sure we even WANT a stupid quit button
-        close_button = tk.Button(self.left_frame, text="Quit", command=self.destroy)
-        close_button.grid(row=2, column=0, sticky="ew")
-        
-        event_button = tk.Button(self.right_frame, text="Event", command=self.trigger_custom_event)
-        event_button.grid(row=2, column=1, sticky="ew")
-
-    def create_terminal_log(self):
-        server_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
-        self.server_text = tk.Text(server_frame)
-        self.server_text.insert("1.0", "SERVER IS RUNNING")
-        
-        server_frame.grid(row=0, column=0) #, sticky = "nesw")
-        self.server_text.grid(row=0, column=0, sticky="ns")
-
-        server_frame.grid_propagate(False)
-    
-    def create_person_counter(self):
-        counter_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
-        self.counter = tk.Text(counter_frame)
-        self.counter.insert("1.0", "PLACEHOLDER")
-        
-        counter_frame.grid(row=1, column=0) #, sticky = "nesw")
-        self.counter.grid(row=1, column=0, sticky="ns")
-
-        counter_frame.grid_propagate(False)
-
-    def create_canvas(self):
-        self.canvas = tk.Canvas(self.right_frame, width=400, height=400)
-        self.canvas.grid(row=0, column=1, rowspan=2, sticky="nesw")
-
-
-def dummy():
-    pass
-
-
-def hey():
-    print("hey")
-
-
+   
+   
+   
+   
+   
+   
 def update_text(text_widget:tk.Text):
     text_widget.delete("1.0", "end")
 
@@ -317,8 +279,12 @@ if __name__ == "__main__":
 
     # # Run GUI and server
     # # threading.Thread(target=server.run).start()
+
+
+
     # server = Server(GridEyeProtocol)
-    # threading.Thread(target=server.run).start()
+    server = Server(lambda:GridEyeProtocol(app))
+    threading.Thread(target=server.run).start()
 
 
     # app = CustomEventDemo()
