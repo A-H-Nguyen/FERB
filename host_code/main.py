@@ -1,9 +1,10 @@
 import threading
 import numpy as np
 import tkinter as tk
+import FERB_GUI 
 
 from blob_detect import BlobDetector
-from FERB_GUI import FERBApp, curr_cam # AAAAAAAAAAAAAAH FUCK YOU
+# from FERB_GUI import FERBApp #, curr_cam # AAAAAAAAAAAAAAH FUCK YOU
 from scipy.interpolate import RegularGridInterpolator
 from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
 
@@ -26,7 +27,7 @@ THRESHOLD_TEMP = 170  # Threshold temperature for blob detection
 
 
 class GridEyeProtocol(FerbProtocol):
-    def __init__(self, app: FERBApp):
+    def __init__(self, app: FERB_GUI.FERBApp):
         super().__init__()
 
         self.app = app
@@ -88,22 +89,9 @@ class GridEyeProtocol(FerbProtocol):
         detected_blobs, count = self.blob_detector.blob_detection(diff_matrix)
         self.app.update_client_person_count(self.client_id, count)
         
-        # interp_func = RegularGridInterpolator((self.orig_coords, 
-        #                                        self.orig_coords), temperature_matrix)
-
-        # difference_matrix = np.clip(temperature_matrix - self.background, 
-        #                             _MIN_VAL, _MAX_VAL)
-        
-        # temp_intrp = interp_func((self.interp_Y, self.interp_X))
-        
-        # if not self.cal_finished:
-        #     self.calibrate(temp_intrp)
-        #     return
-        
-        # difference_matrix = np.clip(np.round(temp_intrp - self.background), _MIN_VAL, _MAX_VAL)
-        
-        global curr_cam
-        if curr_cam == self.client_id:
+        # print("Curr_cam global:", curr_cam)
+        # if curr_cam == self.client_id:
+        if FERB_GUI.curr_cam == self.client_id:
             self.app.draw_image(temperature_matrix)
 
     
@@ -120,8 +108,8 @@ class GridEyeProtocol(FerbProtocol):
         super().connection_made(transport)
         self.app.add_client(self.client_id)
         
-        global curr_cam 
-        curr_cam = self.client_id 
+        # global curr_cam 
+        # curr_cam = self.client_id 
 
 
     def connection_lost(self, exc):
@@ -129,19 +117,13 @@ class GridEyeProtocol(FerbProtocol):
         self.app.remove_client(self.client_id)
 
 
-
-#def draw_me():
- #   print("AAAAAA")
-
-
 if __name__ == "__main__":
     # Create FERB GUI App
-    app = FERBApp()
-    app.add_client(420)
-    app.add_client(69)
-    # server = Server(lambda:GridEyeProtocol(app))
-
+    # app = FERBApp()
+    app = FERB_GUI.FERBApp()
+    
     # Run GUI and server
-   # threang.Thread(target=server.run).start()
+    server = Server(lambda:GridEyeProtocol(app))
+    threading.Thread(target=server.run).start()
     app.mainloop()
 
