@@ -141,9 +141,9 @@ class BlobDetectionProtocol(FerbProtocol):
             for j in range(_INTRP_LEN):
                 diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
 
-        print("Temperature Matrix:")
-        for row in diff_matrix:
-            print(' '.join(map(str, row)))
+#         print("Temperature Matrix:")
+#         for row in diff_matrix:
+#             print(' '.join(map(str, row)))
 
         # Detect blobs and count persons
         print("\nDetected Blobs:")

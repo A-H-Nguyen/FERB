@@ -1,5 +1,6 @@
 import threading
 import numpy as np
+import tkinter as tk
 
 from blob_detect import BlobDetector
 from FERB_GUI import FERBApp, curr_cam # AAAAAAAAAAAAAAH FUCK YOU
@@ -127,12 +128,20 @@ class GridEyeProtocol(FerbProtocol):
         super().connection_lost(exc)
         self.app.remove_client(self.client_id)
 
+
+
+#def draw_me():
+ #   print("AAAAAA")
+
+
 if __name__ == "__main__":
     # Create FERB GUI App
     app = FERBApp()
-
-    server = Server(lambda:GridEyeProtocol(app))
+    app.add_client(420)
+    app.add_client(69)
+    # server = Server(lambda:GridEyeProtocol(app))
 
     # Run GUI and server
-    threading.Thread(target=server.run).start()
+   # threang.Thread(target=server.run).start()
     app.mainloop()
+
