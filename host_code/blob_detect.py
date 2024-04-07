@@ -4,7 +4,7 @@ import numpy as np
 import asyncio
 import queue
 
-from FERB_GUI import FERBApp, Redirect
+from FERB_GUI import FERBApp#, Redirect
 from scipy.interpolate import RegularGridInterpolator
 from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
 # from thermal_cam import ThermalCam
@@ -20,9 +20,7 @@ _GRAYSCALE = 255
 _MIN_VAL = 0
 _MAX_VAL = 5
 
-# Width and Height of the Raspberry Pi screen
-SCREEN_WIDTH = 800  
-SCREEN_HEIGHT = 400 
+# GridEye height in inches
 GRID_EYE_HEIGHT = 52
 
 data_queue = queue.Queue()
@@ -86,65 +84,61 @@ class BlobDetector:
         pixel_occupancy_per_person = average_human_area / pixels
         return pixel_occupancy_per_person
 
-class GridEyeProtocol(FerbProtocol):
-    def __init__(self, screen_len):
-        super().__init__()
-        self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
-        self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
-        self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
-        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
-        self.cal_counter = 0
-        self.blob_detector = BlobDetector()
+# class GridEyeProtocol(FerbProtocol):
+#     def __init__(self, screen_len):
+#         super().__init__()
+#         self.orig_coords = np.linspace(0, _GRID_LEN-1, _GRID_LEN)
+#         self.new_coords = np.linspace(0, _GRID_LEN-1, _INTRP_LEN)
+#         self.interp_X, self.interp_Y = np.meshgrid(self.new_coords, self.new_coords)
+#         self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+#         self.cal_counter = 0
+#         self.blob_detector = BlobDetector()
 
-    def prep_calibration(self):
-        self.print_timestamp(f"Calibrating sensor...")
-        print("Get the fuck out of the way!!!!")
+#     def prep_calibration(self):
+#         self.print_timestamp(f"Calibrating sensor...")
+#         print("Get the fuck out of the way!!!!")
         
-        self._cal = True
-        self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
+#         self._cal = True
+#         self.background = np.zeros(shape=(_INTRP_LEN, _INTRP_LEN))
 
-    def calibrate(self, data):
-        self.background += data
-        self.cal_counter += 1
+#     def calibrate(self, data):
+#         self.background += data
+#         self.cal_counter += 1
 
-        if self.cal_counter == 5:
-            self.background /= self.cal_counter
+#         if self.cal_counter == 5:
+#             self.background /= self.cal_counter
             
-            self.cal_counter = 0
-            self._cal = False
+#             self.cal_counter = 0
+#             self._cal = False
           
-            self.print_timestamp("Calibration finished.")
+#             self.print_timestamp("Calibration finished.")
 
-    def handle_data(self, data):
-        data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
-        interp_func = RegularGridInterpolator((self.orig_coords,
-                                                self.orig_coords),
-                                               data_array.reshape((8, 8)))
-        temperature_matrix = interp_func((self.interp_Y, self.interp_X))
+#     def handle_data(self, data):
+#         data_array = np.frombuffer(data, dtype=np.uint16) * PIXEL_TEMP_CONVERSION
+#         interp_func = RegularGridInterpolator((self.orig_coords,
+#                                                 self.orig_coords),
+#                                                data_array.reshape((8, 8)))
+#         temperature_matrix = interp_func((self.interp_Y, self.interp_X))
 
-        if self._cal:
-            self.calibrate(temperature_matrix)
-            return
+#         if self._cal:
+#             self.calibrate(temperature_matrix)
+#             return
 
-        diff_matrix = np.clip(temperature_matrix - self.background, _MIN_VAL, _MAX_VAL)
+#         diff_matrix = np.clip(temperature_matrix - self.background, _MIN_VAL, _MAX_VAL)
 
-        for i in range(_INTRP_LEN):
-            for j in range(_INTRP_LEN):
-                diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
+#         for i in range(_INTRP_LEN):
+#             for j in range(_INTRP_LEN):
+#                 diff_matrix[i,j] = self.convert_to_grayscale(diff_matrix[i,j])
 
-        print("Temperature Matrix:")
-        for row in diff_matrix:
-            print(' '.join(map(str, row)))
+#         print("Temperature Matrix:")
+#         for row in diff_matrix:
+#             print(' '.join(map(str, row)))
 
-        print("\nDetected Blobs:")
-        detected_blobs = self.blob_detector.blob_detection(diff_matrix)
-        for i, blob in enumerate(detected_blobs, start=1):
-            print(f"Blob {i}: {blob}")
-        print("\n-----------------------------------------\n")
+#         print("\nDetected Blobs:")
+#         detected_blobs = self.blob_detector.blob_detection(diff_matrix)
+#         for i, blob in enumerate(detected_blobs, start=1):
+#             print(f"Blob {i}: {blob}")
+#         print("\n-----------------------------------------\n")
     
-    def convert_to_grayscale(self, value) -> int:
-        return int(((value - _MIN_VAL) / (_MAX_VAL - _MIN_VAL)) * _GRAYSCALE)
-
-if __name__ == "__main__":
-    server = Server(lambda:GridEyeProtocol(SCREEN_HEIGHT))
-    server.run()
+#     def convert_to_grayscale(self, value) -> int:
+#         return int(((value - _MIN_VAL) / (_MAX_VAL - _MIN_VAL)) * _GRAYSCALE)

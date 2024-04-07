@@ -134,6 +134,6 @@ if __name__ == "__main__":
     # server = Server(lambda:GridEyeProtocol(app))
 
     # Run GUI and server
-   # threading.Thread(target=server.run).start()
+   # threang.Thread(target=server.run).start()
     app.mainloop()
 
