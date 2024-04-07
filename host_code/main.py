@@ -6,6 +6,7 @@ import tkinter as tk
 from FERB_GUI import FERBApp, curr_cam # AAAAAAAAAAAAAAH FUCK YOU
 from scipy.interpolate import RegularGridInterpolator
 from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
+from blob_detect import BlobDetector
 
 
 # Number of pixels for both original Grid-EYE output, and interpolated output
@@ -81,7 +82,9 @@ class GridEyeProtocol(FerbProtocol):
                 msg = "___"
 
             self.gui.scrollable_frame.get_frame(self.client_id).update_status(msg)
-            
+        
+        blobDetector = BlobDetector()
+        blobDetector()
 
 ###########################################################
 
@@ -126,7 +129,8 @@ class GridEyeProtocol(FerbProtocol):
 if __name__ == "__main__":
     # Create FERB GUI App
     app = FERBApp()
-
+    app.add_client(420)
+    app.add_client(69)
     # server = Server(lambda:GridEyeProtocol(app))
 
     # Run GUI and server
