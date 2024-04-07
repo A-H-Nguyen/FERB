@@ -1,38 +1,13 @@
 """
 Main file for the FERB GUI
 """
-# import numpy as np
 import tkinter as tk
-# import threading
-import queue  
 
 from FERB_widgets import ScrollableFrame, ThermalCam
 from tkinter import ttk
 
-# Global variables are a stain on this cursed world. They are a sin.
-# A vile and profane proclamation. I can only imagine that my use of this
-# has cursed me, damned me to the deepest blackest pits of damnation where
-# I know I truly belong for my vast transgressions on all of existence
+# Global variables are a stain on this cursed world
 curr_cam = 0
-
-class Redirect():
-    """
-    DON'T FUCKING USE THIS STUPID SHIT.
-
-    We use this to redirect text output from functions like `print` into
-    the tkinter widget of our choosing
-    """
-    def __init__(self, widget, autoscroll=True):
-        self.widget = widget
-        self.autoscroll = autoscroll
-
-    def write(self, text):
-        self.widget.insert('end', text)
-        if self.autoscroll:
-            self.widget.see("end")  # autoscroll
-
-    def flush(self):
-       pass
 
 
 class ClientFrame(tk.Frame):
@@ -60,6 +35,8 @@ class ClientFrame(tk.Frame):
         global curr_cam
         curr_cam = self.id
 
+    def update_status(self, msg:str):
+        self.person_count_data.config(text=msg)
 
 
 class FERBApp(tk.Tk):
@@ -88,7 +65,6 @@ class FERBApp(tk.Tk):
 
         self.create_cam()
         self.create_server_monitor()
-        # self.create_person_counter()
         self.create_quit_btn()
 
     def create_quit_btn(self):
@@ -102,17 +78,6 @@ class FERBApp(tk.Tk):
         self.server_monitor = ScrollableFrame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
         self.server_monitor.grid(row=0, column=0, sticky = "nesw")
     
-    def create_person_counter(self):
-        counter_frame = tk.Frame(self.left_frame, borderwidth=5, relief="ridge", width=380, height=150)
-        # self.counter = tk.Text(counter_frame)
-        # self.counter.insert("1.0", "PLACEHOLDER")
-        self.counter = ttk.Label(counter_frame, text="PLACEHOLDER")
-        
-        counter_frame.grid(row=1, column=0, sticky = "nesw")
-        self.counter.grid(row=1, column=0, sticky="ns")
-
-        counter_frame.grid_propagate(False)
-
     def create_cam(self):
         self.cam = ThermalCam(self.right_frame, width=400, height=400)
         self.cam.grid(row=0, column=1, rowspan=2, sticky="nesw")
@@ -126,6 +91,11 @@ class FERBApp(tk.Tk):
 
     def remove_client(self, client_id):
         self.server_monitor.remove_frame_by_id(client_id)
+
+    def update_client_person_count(self, client_id, new_count):
+        _client = self.server_monitor.get_frame(client_id)
+        _client.update_status(str(new_count))
+
 
     def draw_image(self, data):
         self.cam.draw_bw_image(data)

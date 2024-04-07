@@ -1,11 +1,5 @@
-import sys
-import threading
 import numpy as np
-import asyncio
-import queue
 
-# Importing necessary modules from local files
-from FERB_GUI import FERBApp, Redirect
 from scipy.interpolate import RegularGridInterpolator
 from server_base import Server, FerbProtocol, PIXEL_TEMP_CONVERSION
 
@@ -26,9 +20,6 @@ GRID_EYE_HEIGHT = 10  # Height of the Grid-EYE sensor
 HUMAN_AREA = 80  # Area occupied by a human (in pixels)
 THRESHOLD_TEMP = 170  # Threshold temperature for blob detection
 
-# Queue for storing data, and a lock for synchronization
-data_queue = queue.Queue()
-lock = threading.Lock()
 
 class BlobDetector:
     def __init__(self):
@@ -101,7 +92,7 @@ class BlobDetector:
         return pixel_occupancy_per_person
 
 # Custom protocol for handling data from the GridEye sensor
-class GridEyeProtocol(FerbProtocol):
+class BlobDetectionProtocol(FerbProtocol):
     def __init__(self, screen_len):
         super().__init__()
         # Define original and interpolated coordinates
@@ -167,5 +158,5 @@ class GridEyeProtocol(FerbProtocol):
 
 if __name__ == "__main__":
     # Start the server with the custom GridEyeProtocol
-    server = Server(lambda:GridEyeProtocol(SCREEN_HEIGHT))
+    server = Server(lambda:BlobDetectionProtocol(SCREEN_HEIGHT))
     server.run()
