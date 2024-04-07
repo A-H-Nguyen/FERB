@@ -45,32 +45,16 @@ class NetHandler:
         """
         return self.wlan.config('ssid')
 
-    def connect_to_wifi(self, max_attempts: int, ssid: str, password: str) -> bool:
+    def connect_to_wifi(self, ssid: str, password: str) -> None:
         """
         Attempts to connect to the specified Wi-Fi network using SSID and password.
 
         Args:
-            max_attempts (int): The maximum number of connection attempts.
             ssid (str): The SSID of the Wi-Fi network.
             password (str): The password of the Wi-Fi network.
 
-        Returns:
-            bool: True if a successful connection is made within the max number of attempts 
-                or before reaching the max number of attempts, 
-                returns False otherwise.
         """
-        counter = 0 # the number of connection attempts
-
         self.wlan.connect(ssid=ssid, key=password)
-        while not self.wlan.isconnected():
-            counter += 1
-
-            if not counter < max_attempts:
-                return False
-            
-            time.sleep(5)  # Sleep for 5 seconds before the next attempt
-        
-        return True
 
     def disconnect_wifi(self) -> None:
         """
